@@ -1,0 +1,17 @@
+import sys
+
+sys.path.insert(0, "domain")
+from client_repo import ClientRepo
+
+
+class TestRepo(ClientRepo):
+    """
+    A ClientRepo that uses Github as persistence backend
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._primary_key = self._entity_class.primary_key()
+
+    def find_by_id(self, id):
+        return self._primary_key
