@@ -25,8 +25,10 @@ app = func.FunctionApp()
 
 
 @app.function_name(name="CreateClient")
-@app.route(route="clients/create", methods=["POST"])
-def main(req: func.HttpRequest, context: func.Context) -> func.HttpResponse:
+@app.route(
+    route="clients/create", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS
+)
+def create_client(req: func.HttpRequest) -> func.HttpResponse:
     """
     Azure Function to create a new client.
     :param req: The Azure Function HTTP request.
