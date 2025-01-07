@@ -1,10 +1,10 @@
 # vim: set fileencoding=utf-8
 """
-org/acmsl/licdata/infrastructure/clients/azure_functions/__init__.py
+org/acmsl/licdata/infrastructure/azure/clients/create.py
 
-This file ensures org.acmsl.licdata.infrastructure.clients.azure_functions is a namespace.
+This file defines the Create-Client script for Azure.
 
-Copyright (C) 2024-today acmsl's Licdata-Infrastructure
+Copyright (C) 2024-today acm-sl's licdata
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,10 +19,27 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-__path__ = __import__("pkgutil").extend_path(__path__, __name__)
+import azure.functions as func
 
-from .create import create_client
-from .list import list_cients
+app = func.FunctionApp()
+
+
+@app.function_name(name="ListClients")
+@app.route(route="clients", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+def list_clients(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Azure Function to list existing clients.
+    :param req: The Azure Function HTTP request.
+    :type req: azure.functions.HttpRequest
+    :param context: The Azure Function context.
+    :type context: azure.functions.Context
+    :return: The response.
+    :rtype: azure.functions.HttpResponse
+    """
+    return func.HttpResponse(
+        "This HTTP triggered function executed successfully.", status_code=200
+    )
+
 
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et
 # Local Variables:
