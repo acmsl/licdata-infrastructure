@@ -21,13 +21,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import azure.functions as func
 
-app = func.FunctionApp()
+bp = func.Blueprint()
 
 
-@app.function_name(name="CreateClient")
-@app.route(
-    route="clients/create", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS
-)
+@bp.function_name(name="CreateClient")
+@bp.route(route="clients/create", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def create_client(req: func.HttpRequest) -> func.HttpResponse:
     """
     Azure Function to create a new client.

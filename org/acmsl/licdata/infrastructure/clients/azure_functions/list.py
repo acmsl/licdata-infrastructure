@@ -21,11 +21,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import azure.functions as func
 
-app = func.FunctionApp()
+bp = func.Blueprint()
 
 
-@app.function_name(name="ListClients")
-@app.route(route="clients", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+@bp.function_name(name="ListClients")
+@bp.route(route="clients", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def list_clients(req: func.HttpRequest) -> func.HttpResponse:
     """
     Azure Function to list existing clients.
