@@ -1,8 +1,8 @@
 # vim: set fileencoding=utf-8
 """
-org/acmsl/licdata/infrastructure/azure/clients/create.py
+org/acmsl/licdata/infrastructure/azure/clients/list.py
 
-This file defines the Create-Client script for Azure.
+This file defines the List-Clients script for Azure.
 
 Copyright (C) 2024-today acm-sl's licdata
 
@@ -20,13 +20,16 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import azure.functions as func
+from pythoneda.shared.infrastructure.azure.functions import get_pythoneda_app
 
 bp = func.Blueprint()
 
 
 @bp.function_name(name="ListClients")
 @bp.route(route="clients", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
-def list_clients(req: func.HttpRequest) -> func.HttpResponse:
+async def list_clients(
+    req: func.HttpRequest, context: func.Context
+) -> func.HttpResponse:
     """
     Azure Function to list existing clients.
     :param req: The Azure Function HTTP request.
@@ -36,6 +39,12 @@ def list_clients(req: func.HttpRequest) -> func.HttpResponse:
     :return: The response.
     :rtype: azure.functions.HttpResponse
     """
+    app = get_pythoneda_app()
+
+    logging = Ports.instance().resolve_first(LoggingPort)
+    logging.info(f"Using app: {app}")
+    context.logger.info("Using app: {app}")
+
     return func.HttpResponse(
         "This HTTP triggered function executed successfully.", status_code=200
     )
