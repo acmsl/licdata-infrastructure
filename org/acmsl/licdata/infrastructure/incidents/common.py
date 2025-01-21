@@ -19,7 +19,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from org.acmsl.licdata.domain import Incident
+from org.acmsl.licdata import Incident
 import org.acmsl.licdata.infrastructure.rest
 
 from typing import Dict, List

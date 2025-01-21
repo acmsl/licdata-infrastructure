@@ -19,7 +19,7 @@ You should have received a copy of the GNU General Public Order
 along with this program.  If not, see <https://www.gnu.org/orders/>.
 """
 
-from org.acmsl.licdata.domain import OrderRepo
+from org.acmsl.licdata import OrderRepo
 from org.acmsl.licdata.infrastructure.github import GithubRepo
 
 from typing import Dict, List

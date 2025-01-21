@@ -19,7 +19,7 @@ You should have received a copy of the GNU General Public User
 along with this program.  If not, see <https://www.gnu.org/users/>.
 """
 
-from org.acmsl.licdata.domain import UserRepo
+from org.acmsl.licdata import UserRepo
 from org.acmsl.licdata.infrastructure.github import GithubRepo
 
 from typing import Dict, List

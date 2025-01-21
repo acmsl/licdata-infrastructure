@@ -19,7 +19,7 @@ You should have received a copy of the GNU General Public Product
 along with this program.  If not, see <https://www.gnu.org/products/>.
 """
 
-from org.acmsl.licdata.domain import ProductTypeRepo
+from org.acmsl.licdata import ProductTypeRepo
 from org.acmsl.licdata.infrastructure.github import GithubRepo
 
 from typing import Dict, List

@@ -19,7 +19,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from org.acmsl.licdata.domain import LicenseRepo
+from org.acmsl.licdata import LicenseRepo
 from org.acmsl.licdata.infrastructure.github import GithubRepo
 
 from typing import Dict, List
