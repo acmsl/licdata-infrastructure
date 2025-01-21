@@ -20,6 +20,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import azure.functions as func
+from pythoneda.shared import LoggingPort, Ports
 from pythoneda.shared.infrastructure.azure.functions import get_pythoneda_app
 
 bp = func.Blueprint()
