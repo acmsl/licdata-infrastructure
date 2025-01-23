@@ -19,7 +19,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from org.acmsl.licdata import ClientRepo
+from org.acmsl.licdata import Client, ClientRepo
 from org.acmsl.licdata.infrastructure.github import GithubRepo
 
 from typing import Dict, List
@@ -75,6 +75,16 @@ class GithubClientRepo(ClientRepo):
         :rtype: Client from domain.client
         """
         return self._githubRepo.find_by_attribute(attribute_name, attribute_value)
+
+    def filter(self, dictionary: Dict) -> List[Client]:
+        """
+        Retrieves the entities matching given criteria.
+        :param dictionary: The filter.
+        :type dictionary: Dict
+        :return: The instances of the EntityClass matching given criteria, or an empty list if none found.
+        :rtype: List[pythoneda.Entity]
+        """
+        return self._githubRepo.filter(dictionary)
 
     def insert(self, item):
         """

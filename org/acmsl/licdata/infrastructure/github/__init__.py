@@ -1,6 +1,6 @@
 # vim: set fileencoding=utf-8
 """
-org/acmsl/licdata/infrastructure/clients/github/__init__.py
+org/acmsl/licdata/infrastructure/github/__init__.py
 
 This file ensures org.acmsl.licdata.infrastructure.clients.github is a namespace.
 

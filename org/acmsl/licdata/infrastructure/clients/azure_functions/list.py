@@ -23,6 +23,7 @@ import azure.functions as func
 from pythoneda.shared import LoggingPort, Ports
 from pythoneda.shared.infrastructure.azure.functions import get_pythoneda_app
 
+
 bp = func.Blueprint()
 
 
@@ -40,14 +41,22 @@ async def list_clients(
     :return: The response.
     :rtype: azure.functions.HttpResponse
     """
+    import sys
+
+    print("In list_clients", file=sys.stderr)
+
     app = get_pythoneda_app()
 
-    logging = Ports.instance().resolve_first(LoggingPort)
-    logging.info(f"Using app: {app}")
-    context.logger.info("Using app: {app}")
+    ports = Ports.instance()
+    if ports is None:
+        print(f"ports is None")
+    else:
+        logging = ports.resolve_first(LoggingPort)
+        logging.info(f"Using app: {app}")
+    # context.logger.info("Using app: {app}")
 
     return func.HttpResponse(
-        "This HTTP triggered function executed successfully.", status_code=200
+        f"{app}: This HTTP triggered function executed successfully.", status_code=200
     )
 
 

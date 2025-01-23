@@ -51,7 +51,7 @@ class GithubRepo(BaseObject):
         self._primary_key = entityClass.primary_key()
         self._filter_attributes = entityClass.filter_attributes()
         self._attributes = entityClass.attributes()
-        self._encrypted_attributes = entityClass.encrypted_attributes()
+        self._sensitive_attributes = entityClass.sensitive_attributes()
 
     def __str__(self):
         """
@@ -94,13 +94,13 @@ class GithubRepo(BaseObject):
         return self._attributes
 
     @property
-    def encrypted_attributes(self) -> List:
+    def sensitive_attributes(self) -> List:
         """
-        Retrieves the attributes that need to be encrypted.
+        Retrieves the sensitive attributes.
         :return: The names of the attributes to encrypt.
         :rtype: List
         """
-        return self._encrypted_attributes
+        return self._sensitive_attributes
 
     def find_by_id(self, id: str):
         """
