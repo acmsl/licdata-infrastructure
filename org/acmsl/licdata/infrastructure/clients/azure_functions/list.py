@@ -20,11 +20,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import azure.functions as func
-from pythoneda.shared import LoggingPort, Ports
-from pythoneda.shared.infrastructure.azure.functions import get_pythoneda_app
 
 
 bp = func.Blueprint()
+
+from pythoneda.shared.infrastructure.azure.functions import get_pythoneda_app
 
 
 @bp.function_name(name="ListClients")
@@ -41,18 +41,20 @@ async def list_clients(
     :return: The response.
     :rtype: azure.functions.HttpResponse
     """
-    import sys
 
-    print("In list_clients", file=sys.stderr)
+    from pythoneda.shared import LoggingPort, Ports
 
     app = get_pythoneda_app()
 
     ports = Ports.instance()
-    if ports is None:
-        print(f"ports is None")
-    else:
+    if ports is not None:
         logging = ports.resolve_first(LoggingPort)
-        logging.info(f"Using app: {app}")
+        if logging is None:
+            import sys
+
+            print(f"**\nLogging port not found!!!!\n**\n", file=sys.stderr)
+        else:
+            logging.logger("clients.azure_functions.list").info(f"Using app: {app}")
     # context.logger.info("Using app: {app}")
 
     return func.HttpResponse(

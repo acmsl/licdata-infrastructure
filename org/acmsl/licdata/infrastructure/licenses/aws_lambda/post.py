@@ -19,7 +19,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from org.acmsl.licdata.domain import ClientRepo, LicenseRepo, PcRepo
+from org.acmsl.licdata import ClientRepo, LicenseRepo, PcRepo
 import org.acmsl.licdata.infrastructure.params
 import org.acmsl.licdata.infrastructure.mail
 import org.acmsl.licdata.infrastructure.resp

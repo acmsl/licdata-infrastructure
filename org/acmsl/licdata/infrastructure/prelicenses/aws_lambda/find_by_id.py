@@ -21,6 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from org.acmsl.licdata import PrelicenseRepo
 import org.acmsl.licdata.infrastructure.rest
+from pythoneda.shared import Ports
 
 from typing import Dict
 
@@ -35,4 +36,6 @@ def handler(event, context) -> Dict:
     :return: The response.
     :rtype: Dict
     """
-    return rest.find_by_id(event, context, Licdata.instance().get_repo(PrelicenseRepo))
+    return rest.find_by_id(
+        event, context, Ports.instance().resolve_first(PrelicenseRepo)
+    )

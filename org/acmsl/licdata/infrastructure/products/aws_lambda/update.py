@@ -20,6 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 from org.acmsl.licdata import ProductRepo
+import org.acmsl.licdata.infrastructure.products.common
 import org.acmsl.licdata.infrastructure.rest
 from pythoneda.shared import Ports
 

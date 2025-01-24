@@ -20,6 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 from org.acmsl.licdata import UserRepo
+import org.acmsl.licdata.infrastructure.users.common
 import org.acmsl.licdata.infrastructure.rest
 from pythoneda.shared import Ports
 

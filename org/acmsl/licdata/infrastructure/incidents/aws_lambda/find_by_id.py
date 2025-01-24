@@ -20,8 +20,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 from org.acmsl.licdata import IncidentRepo
-import org.acmsl.licdata.infrastructure.aws_lambda.clients.common
-import org.acmsl.licdata.infrastructure.aws_lambda.rest
+import org.acmsl.licdata.infrastructure.incidents.common
+import org.acmsl.licdata.infrastructure.rest
 from pythoneda.shared import Ports
 
 from typing import Dict

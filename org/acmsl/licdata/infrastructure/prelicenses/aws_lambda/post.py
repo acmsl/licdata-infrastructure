@@ -48,22 +48,6 @@ def handler(event, context) -> Dict:
 
 
 """ old handler """
-import sys
-
-sys.path.insert(0, "clients")
-sys.path.insert(0, "common")
-sys.path.insert(0, "licenses")
-sys.path.insert(0, "pcs")
-
-import json
-
-import clientrepo
-import licenserepo
-import prelicenserepo
-import params
-import pcrepo
-import mail
-import resp
 
 
 def old_handler(event, context):

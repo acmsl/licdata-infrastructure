@@ -21,7 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from org.acmsl.licdata import PcRepo
 import org.acmsl.licdata.infrastructure.pcs.common
-import org.acmsl.licdata.infrastructure..rest
+import org.acmsl.licdata.infrastructure.rest
 from pythoneda.shared import Ports
 
 from typing import Dict
