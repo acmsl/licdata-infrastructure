@@ -232,12 +232,9 @@ def compute_nonce(input: str, hmacKey: bytes) -> bytes:
     :rtype: bytes
     """
     hmac_state = HmacSha1State(hmacKey)
-    bytes_for_nonce = input
-    if input[:10] == b"\x00GITCRYPT\x00":
-        bytes_for_nonce = input[10:]
-    hmac_state.add(bytes_for_nonce)
+    hmac_state.add(input)
     full_hmac = hmac_state.get()  # 20 bytes (HMAC-SHA1 output)
-    return full_hmac[:16]  # First 16 bytes for AES-CTR nonce
+    return full_hmac[:12]  # First 16 bytes for AES-CTR nonce
 
 
 def decrypt(encryptedText: str) -> str:
@@ -264,9 +261,11 @@ def decrypt(encryptedText: str) -> str:
     hmac_state.add(plaintext)
 
     # Verify the HMAC against the stored nonce
-    # computed_nonce = compute_nonce(plaintext, hmac_key)
-    # if computed_nonce != nonce:
-    #    raise ValueError("Decryption failed: HMAC mismatch!")
+    computed_nonce = compute_nonce(plaintext, hmac_key)
+    if computed_nonce != nonce:
+        raise ValueError(
+            "Decryption failed: HMAC mismatch! ({nonce} != {computed_nonce})"
+        )
 
     result = plaintext.decode("utf-8")
 
