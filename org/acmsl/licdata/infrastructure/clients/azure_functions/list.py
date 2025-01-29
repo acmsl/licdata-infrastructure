@@ -42,24 +42,23 @@ async def list_clients(
     :rtype: azure.functions.HttpResponse
     """
 
-    from pythoneda.shared import LoggingPort, Ports
+    from pythoneda.shared import Ports
+    from org.acmsl.licdata import ClientRepo
+    import org.acmsl.licdata.infrastructure.rest as rest
 
-    app = get_pythoneda_app()
+    client_repo = Ports.instance().resolve_first(ClientRepo)
+    ClientRepo.logger().info("Listing clients.")
 
-    ports = Ports.instance()
-    if ports is not None:
-        logging = ports.resolve_first(LoggingPort)
-        if logging is None:
-            import sys
+    event = {
+        "httpMethod": "GET",
+        "queryStringParameters": req.params,
+        "headers": req.headers,
+        "body": {},
+    }
 
-            print(f"**\nLogging port not found!!!!\n**\n", file=sys.stderr)
-        else:
-            logging.logger("clients.azure_functions.list").info(f"Using app: {app}")
-    # context.logger.info("Using app: {app}")
+    resp = rest.list(event, context, Ports.instance().resolve_first(ClientRepo))
 
-    return func.HttpResponse(
-        f"{app}: This HTTP triggered function executed successfully.", status_code=200
-    )
+    return func.HttpResponse(resp["body"], status_code=resp["statusCode"])
 
 
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et

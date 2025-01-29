@@ -21,7 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
 import threading
-from github import Github
+from github import Auth, Github
 
 
 def get_repo():
@@ -34,13 +34,20 @@ def get_repo():
 
     if not hasattr(local, "repo"):
         if not hasattr(local, "token"):
-            local.token = os.environ["GITHUB_TOKEN"]
+            token = os.environ.get("GITHUB_TOKEN", None)
+            if token is None:
+                print("GITHUB_TOKEN environment variable not set")
+                raise ValueError("GITHUB_TOKEN environment variable not set")
+            local.token = token
 
         if not hasattr(local, "github"):
-            local.github = Github(local.token)
+            local.github = Github(auth=Auth.Token(local.token))
 
         if not hasattr(local, "repository_name"):
-            local.repository_name = os.environ["GITHUB_REPO"]
+            repository_name = os.environ.get("GITHUB_REPO", None)
+            if repository_name is None:
+                raise ValueError("GITHUB_REPO environment variable not set")
+            local.repository_name = repository_name
 
         local.repo = local.github.get_repo(local.repository_name)
 
@@ -56,7 +63,10 @@ def get_branch():
     local = threading.local()
 
     if not hasattr(local, "branch"):
-        local.branch = os.environ["GITHUB_BRANCH"]
+        branch = os.environ.get("GITHUB_BRANCH", None)
+        if branch is None:
+            raise ValueError("GITHUB_BRANCH environment variable not set")
+        local.branch = branch
 
     return local.branch
 

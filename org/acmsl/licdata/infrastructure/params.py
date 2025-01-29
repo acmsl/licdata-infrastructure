@@ -37,7 +37,9 @@ def load_body(event):
 
     body_entry = event.get("body", event)
 
-    if body_entry:
+    if body_entry is None:
+        body = {"error": "Missing 'body'"}
+    else:
         if type(body_entry) is dict:
             body = body_entry
             error = False
@@ -56,8 +58,6 @@ def load_body(event):
                     }
         else:
             body = {"error": "Unknown input"}
-    else:
-        print("body is null")
 
     return (body, error)
 

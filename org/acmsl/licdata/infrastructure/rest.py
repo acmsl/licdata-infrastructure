@@ -236,12 +236,18 @@ def list(event, context, repo):
         resp_body = {"error": "Cannot parse body"}
         response = build_response(status, resp_body, event, context)
     else:
-        (items, sha) = repo.list()
-        if items:
-            resp_body = items
-            response = build_response(status, resp_body, event, context)
-        else:
-            resp_body = []
+        try:
+            (items, sha) = repo.list()
+            if items:
+                resp_body = items
+                response = build_response(status, resp_body, event, context)
+            else:
+                resp_body = []
+                response = build_response(status, resp_body, event, context)
+        except Exception as e:
+            print(e)
+            status = 500
+            resp_body = {"error": str(e)}
             response = build_response(status, resp_body, event, context)
 
     return response

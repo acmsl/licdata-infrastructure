@@ -19,7 +19,7 @@ You should have received a copy of the GNU General Public User
 along with this program.  If not, see <https://www.gnu.org/users/>.
 """
 
-from org.acmsl.licdata.infrastructure.crypt_utils import encrypt, decrypt_file
+from org.acmsl.licdata.infrastructure.crypt_utils import encrypt, decrypt
 from org.acmsl.licdata.infrastructure.github.github_access import get_repo_and_branch
 
 
@@ -33,12 +33,15 @@ def get_contents(path: str):
     """
     result = None
 
+    print(f"Retrieving repo and branch")
     (repo, branch) = get_repo_and_branch()
 
+    print(f"Getting contents of {path} in {repo} on {branch}")
     file = repo.get_contents(path, ref=branch)
 
+    print(f"Decrypting {file.content}...")
     try:
-        result = decrypt_file(file, path)
+        result = decrypt(file.content)
     except Exception as e:
         result = None
         print(f"Cannot decrypt {path}: {e}")

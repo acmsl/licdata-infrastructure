@@ -19,6 +19,7 @@ You should have received a copy of the GNU General Public User
 along with this program.  If not, see <https://www.gnu.org/users/>.
 """
 
+import inspect
 from org.acmsl.licdata.infrastructure.github import github_adapter
 from pythoneda.shared import BaseObject
 from typing import Dict, List, Type
@@ -48,6 +49,7 @@ class GithubRepo(BaseObject):
         """
         super().__init__()
         self._path = path
+        self._entity_class = entityClass
         self._primary_key = entityClass.primary_key()
         self._filter_attributes = entityClass.filter_attributes()
         self._attributes = entityClass.attributes()
@@ -57,7 +59,38 @@ class GithubRepo(BaseObject):
         """
         Provides a text representation of this instance.
         """
-        return f"{ 'path': '{self._path}', 'primary_key': '{self._primary_key}', 'filter_attributes': '{self._filter_attributes}', 'attributes': '{self._attributes}', 'encrypted_attributes': '{self._encripted_attributes}'}"
+        primary_key = ", ".join([f'"{attr}"' for attr in self._primary_key])
+        filter_attributes = ", ".join(
+            [
+                f'"{name}"'
+                for name, value in inspect.getmembers(
+                    self._entity_class,
+                    lambda v: v in self._entity_class.filter_attributes()
+                    and isinstance(v, property),
+                )
+            ]
+        )
+        attributes = ", ".join(
+            [
+                f'"{name}"'
+                for name, value in inspect.getmembers(
+                    self._entity_class,
+                    lambda v: v in self._entity_class.attributes()
+                    and isinstance(v, property),
+                )
+            ]
+        )
+        sensitive_attributes = ", ".join(
+            [
+                f'"{name}"'
+                for name, value in inspect.getmembers(
+                    self._entity_class,
+                    lambda v: v in self._entity_class.sensitive_attributes()
+                    and isinstance(v, property),
+                )
+            ]
+        )
+        return f"{{ 'path': '{self._path}', 'primary_key': [ {primary_key} ], 'filter_attributes': [ {filter_attributes} ], 'attributes': [ {attributes} ], 'sensitive_attributes': [ {sensitive_attributes} ] }}"
 
     @property
     def path(self):
@@ -150,7 +183,7 @@ class GithubRepo(BaseObject):
             self._primary_key,
             self._filter_attributes,
             self._attributes,
-            self._encrypted_attributes,
+            self._sensitive_attributes,
         )
 
     def update(self, item) -> bool:
@@ -167,7 +200,7 @@ class GithubRepo(BaseObject):
             self._primary_key,
             self._filter_attributes,
             self._attributes,
-            self._encrypted_attributes,
+            self._sensitive_attributes,
         )
 
     def delete(self, id: str) -> bool:
@@ -196,6 +229,7 @@ class GithubRepo(BaseObject):
         :return: The list of items.
         :rtype: List
         """
+        GithubRepo.logger().info(f"Listing items in {self._path}")
         return github_adapter.list(self._path)
 
 

@@ -374,13 +374,10 @@ def list(path: str) -> List:
     result = []
     sha = None
 
-    try:
-        (data, sha) = get_contents(f"{path}/data.json")
-        print(f"{path}/data.json -> {data}")
-    except:
-        data = None
-    if data:
-        result = json.loads(data)
+    print(f"Calling get_contents({path}/data.json)")
+    (data, sha) = get_contents(f"{path}/data.json")
+    print(f"{path}/data.json -> {data}")
+    result = json.loads(data)
 
     return (result, sha)
 

@@ -22,8 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 __path__ = __import__("pkgutil").extend_path(__path__, __name__)
 
 from .create import create_client
-
-# from .list import list_clients
+from .list import list_clients
 
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et
 # Local Variables:

@@ -43,7 +43,7 @@ class GithubClientRepo(ClientRepo):
         Creates a new instance.
         """
         super().__init__()
-        self._githubRepo = GithubRepo("clients", self._entity_class)
+        self._github_repo = GithubRepo("clients", self._entity_class)
 
     @property
     def path(self):
@@ -52,7 +52,7 @@ class GithubClientRepo(ClientRepo):
         :return: The path.
         :rtype: str
         """
-        return self._githubRepo.path
+        return self._github_repo.path
 
     def find_by_id(self, id: str):
         """
@@ -62,7 +62,7 @@ class GithubClientRepo(ClientRepo):
         :return: The client.
         :rtype: Client from domain.client
         """
-        return self._githubRepo.find_by_id(id)
+        return self._github_repo.find_by_id(id)
 
     def find_by_attribute(self, attributeName: str, attributeValue: str):
         """
@@ -74,7 +74,7 @@ class GithubClientRepo(ClientRepo):
         :return: The client.
         :rtype: Client from domain.client
         """
-        return self._githubRepo.find_by_attribute(attribute_name, attribute_value)
+        return self._github_repo.find_by_attribute(attribute_name, attribute_value)
 
     def filter(self, dictionary: Dict) -> List[Client]:
         """
@@ -84,7 +84,7 @@ class GithubClientRepo(ClientRepo):
         :return: The instances of the EntityClass matching given criteria, or an empty list if none found.
         :rtype: List[pythoneda.Entity]
         """
-        return self._githubRepo.filter(dictionary)
+        return self._github_repo.filter(dictionary)
 
     def insert(self, item):
         """
@@ -92,7 +92,7 @@ class GithubClientRepo(ClientRepo):
         :param item: The client.
         :type item: Client from domain.client
         """
-        return self._githubRepo.insert(item)
+        return self._github_repo.insert(item)
 
     def update(self, item):
         """
@@ -100,7 +100,7 @@ class GithubClientRepo(ClientRepo):
         :param item: The client to update.
         :type item: Client from domain.client
         """
-        return self._githubRepo.update(item)
+        return self._github_repo.update(item)
 
     def delete(self, id: str):
         """
@@ -110,7 +110,7 @@ class GithubClientRepo(ClientRepo):
         :return: True if the client is removed.
         :rtype: bool
         """
-        return self._githubRepo.delete(id)
+        return self._github_repo.delete(id)
 
     def find_by_pk(self, pk: Dict):
         """
@@ -120,7 +120,7 @@ class GithubClientRepo(ClientRepo):
         :return: The client matching given criteria.
         :rtype: Client from domain.client
         """
-        return self._githubRepo.find_by_pk(pk)
+        return self._github_repo.find_by_pk(pk)
 
     def list(self) -> List:
         """
@@ -128,4 +128,6 @@ class GithubClientRepo(ClientRepo):
         :return: The list of all clients.
         :rtype: List
         """
-        return self._githubRepo.list()
+        print(f"Requesting {self._github_repo}.list()")
+        GithubClientRepo.logger().debug(f"Requesting {self._github_repo}.list()")
+        return self._github_repo.list()
