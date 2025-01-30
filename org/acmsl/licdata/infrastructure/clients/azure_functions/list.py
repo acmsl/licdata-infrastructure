@@ -24,8 +24,6 @@ import azure.functions as func
 
 bp = func.Blueprint()
 
-from pythoneda.shared.infrastructure.azure.functions import get_pythoneda_app
-
 
 @bp.function_name(name="ListClients")
 @bp.route(route="clients", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
@@ -47,7 +45,6 @@ async def list_clients(
     import org.acmsl.licdata.infrastructure.rest as rest
 
     client_repo = Ports.instance().resolve_first(ClientRepo)
-    ClientRepo.logger().info("Listing clients.")
 
     event = {
         "httpMethod": "GET",

@@ -77,17 +77,17 @@ def retrieve_param(paramName: str, body, event, defaultValue) -> str:
     result = None
 
     if body:
-        result = body.get(paramName, {})
+        result = body.get(paramName, None)
 
-    if not result:
+    if result is None:
         query_string_parameters = event.get("queryStringParameters", {})
-        result = query_string_parameters.get(paramName)
+        result = query_string_parameters.get(paramName, None)
 
-    if not result:
+    if result is None:
         path_parameters = event.get("pathParameters", {})
         result = path_parameters.get(paramName)
 
-    if not result:
+    if result is None:
         result = event.get(paramName, defaultValue)
 
     return result

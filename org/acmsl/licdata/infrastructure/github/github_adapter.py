@@ -91,6 +91,7 @@ def find_all_by_attributes(filter: Dict, path: str):
             x for x in all_items_content if _attributes_match(x, item, filter.keys())
         ]
 
+    print(f"find_all_by_attributes({filter}, {path}) -> {result}")
     return (result, sha)
 
 
@@ -185,15 +186,14 @@ def insert(
     result = new_id()
     created = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     data = None
-    sha = None
+    insert_new_file = False
     item = {}
-    item["id"] = result
-
     for attribute in primaryKey + filterKeys:
-        value = entity.get(attribute)
+        value = entity.get(attribute, None)
         if attribute in encryptedAttributes:
             value = encrypt(value)
         item[attribute] = value
+    item["id"] = result
 
     try:
         (data, sha) = get_contents(f"{path}/data.json")
@@ -207,12 +207,11 @@ def insert(
             json.dumps(content),
             f"First instance in {path} collection: {result}",
         )
+        insert_new_file = True
     else:
         content = json.loads(data)
-        entries = [x for x in content if _attributes_match(x, entity, filterKeys)]
-        if entries:
-            result = entries[0]["id"]
-        else:
+        entries = [x for x in content if _attributes_match(x, entity, primaryKey)]
+        if len(entries) == 0:
             content.append(item)
             update_file(
                 f"{path}/data.json",
@@ -220,22 +219,43 @@ def insert(
                 f"Updated {result} in {path} collection",
                 sha,
             )
+            insert_new_file = True
+        else:
+            print(f"Entity {entity} already exists in {path} collection")
+            insert_new_file = False
 
-    for attribute in attributeNames:
-        value = entity.get(attribute)
-        if attribute in encryptedAttributes:
-            value = encrypt(value)
-        item[attribute] = value
-    item["_created"] = created
-    item.pop("_updated", None)
-    print(f"Inserting {item} in {path}/{result}/data.json")
-    create_file(
-        f"{path}/{result}/data.json",
-        json.dumps(item),
-        f"Created a new entry {result} in {path} collection",
-    )
+    if insert_new_file:
+        item = {}
+        for attribute in attributeNames:
+            value = entity.get(attribute, None)
+            if attribute in encryptedAttributes:
+                value = encrypt(value)
+            item[attribute] = value
+        item["id"] = result
+        item["_created"] = created
+        item.pop("_updated", None)
+        print(f"Inserting {item} in {path}/{result}/data.json")
+        create_file(
+            f"{path}/{result}/data.json",
+            json.dumps(item),
+            f"Created a new entry {result} in {path} collection",
+        )
 
     return result
+
+
+def get_property_name(property) -> str:
+    """
+    Retrieves the name of the property.
+    :param property: The property.
+    :type property: property
+    :return: The name of the property.
+    :rtype: str
+    """
+    if isinstance(property, str):
+        return property
+    else:
+        return property.fget.__name__
 
 
 def _attributes_match(item, target, attributeNames: List):
@@ -251,7 +271,7 @@ def _attributes_match(item, target, attributeNames: List):
     """
     result = True
 
-    for attribute_name in attribute_names:
+    for attribute_name in attributeNames:
         if item.get(attribute_name) != target.get(attribute_name):
             result = False
             break

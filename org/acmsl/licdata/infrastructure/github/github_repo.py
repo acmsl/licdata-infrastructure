@@ -229,7 +229,6 @@ class GithubRepo(BaseObject):
         :return: The list of items.
         :rtype: List
         """
-        GithubRepo.logger().info(f"Listing items in {self._path}")
         return github_adapter.list(self._path)
 
 

@@ -237,6 +237,22 @@ def compute_nonce(input: str, hmacKey: bytes) -> bytes:
     return full_hmac[:12]  # First 16 bytes for AES-CTR nonce
 
 
+def is_base64_encoded(s: str) -> bool:
+    """
+    Checks if a given string is valid base64-encoded data.
+    :param s: The string to check.
+    :type s: str
+    :return: True if it's valid base64, False otherwise.
+    :rtype: bool
+    """
+    try:
+        # Decode and check if re-encoding matches the original (ignoring padding)
+        decoded = base64.b64decode(s, validate=True)
+        return base64.b64encode(decoded).decode().strip("=") == s.strip("=")
+    except Exception:
+        return False
+
+
 def decrypt(encryptedText: str) -> str:
     """
     Decrypts a base64-encoded encrypted string.
@@ -267,9 +283,7 @@ def decrypt(encryptedText: str) -> str:
             "Decryption failed: HMAC mismatch! ({nonce} != {computed_nonce})"
         )
 
-    result = plaintext.decode("utf-8")
-
-    return result
+    return plaintext.decode("utf-8")
 
 
 def encrypt(plaintext: str) -> str:
@@ -280,18 +294,29 @@ def encrypt(plaintext: str) -> str:
     :return: The encrypted text in base64 format.
     :rtype: str
     """
-    raise ValueError("Encryption not supported yet")
-    aes_key, hmac_key = get_key()
-    iv = os.urandom(16)  # Generate a random initialization vector
-    cipher = Cipher(algorithms.AES(aes_key), modes.CFB(iv))
-    encryptor = cipher.encryptor()
+    aes_key, hmac_key = get_key()  # Get AES and HMAC keys
 
-    # Convert plaintext to bytes and pad to ensure AES block alignment
+    # Convert plaintext to bytes
     plaintext_bytes = plaintext.encode("utf-8")
-    ciphertext = encryptor.update(plaintext_bytes) + encryptor.finalize()
 
-    # Return base64 encoded IV + ciphertext
-    return base64.b64encode(iv + ciphertext).decode("utf-8")
+    # Compute nonce (first 12 bytes of HMAC-SHA1 of plaintext)
+    nonce = compute_nonce(plaintext_bytes, hmac_key)
+
+    # AES-CTR requires a 16-byte nonce, so extend it with four zero bytes
+    extended_nonce = nonce + b"\x00\x00\x00\x00"
+
+    # Initialize AES-CTR encryptor
+    aes = AesCtrEncryptor(aes_key, extended_nonce)
+    hmac_state = HmacSha1State(hmac_key)
+
+    # Encrypt the plaintext
+    ciphertext = aes.process(plaintext_bytes)
+
+    # Compute HMAC of plaintext for verification
+    hmac_state.add(plaintext_bytes)
+
+    # Construct encrypted data: preamble + nonce + ciphertext
+    return b"\x00GITCRYPT\x00" + nonce + ciphertext
 
 
 class AesCtrDecryptor:
@@ -311,6 +336,25 @@ class AesCtrDecryptor:
         :return: Decrypted plaintext (bytes)
         """
         return self.decryptor.update(data)
+
+
+class AesCtrEncryptor:
+    def __init__(self, key, nonce):
+        """
+        Initialize the AES-CTR encryptor with the given key and nonce.
+        :param key: AES key (bytes)
+        :param nonce: Nonce for AES-CTR (bytes)
+        """
+        self.cipher = Cipher(algorithms.AES(key), modes.CTR(nonce))
+        self.encryptor = self.cipher.encryptor()
+
+    def process(self, data):
+        """
+        Decrypt data using AES-CTR.
+        :param data: The ciphertext to decrypt (bytes)
+        :return: Decrypted plaintext (bytes)
+        """
+        return self.encryptor.update(data)
 
 
 class HmacSha1State:

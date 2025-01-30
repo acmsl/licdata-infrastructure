@@ -20,7 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 from org.acmsl.licdata import Client
-import org.acmsl.licdata.infrastructure.rest
+import org.acmsl.licdata.infrastructure.rest as rest
 
 from typing import Dict, List
 

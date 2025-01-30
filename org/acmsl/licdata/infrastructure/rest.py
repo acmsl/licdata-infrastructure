@@ -42,7 +42,7 @@ def retrieve_attributes_from_params(body: Dict, event, attributeNames: List) -> 
     """
     result = {}
 
-    for attribute in attribute_names:
+    for attribute in attributeNames:
         result[attribute] = retrieve_param(attribute, body, event, None)
 
     return result
@@ -70,9 +70,7 @@ def find_by_id(event, context, repo):
     else:
         id = retrieve_id(body, event)
 
-        print(f"Finding by {id}")
         (item, sha) = repo.find_by_id(id)
-        print(f"Retrieved {item}")
         if item:
             status = 200
             resp_body = item
@@ -134,9 +132,7 @@ def create(
             resp_body.update(attributes)
             resp_body.update({"id": id})
             response = build_response(status, resp_body, event, context)
-            response["headers"].update(
-                {"Location": f"https://{host}/{repo.path()}/{id}"}
-            )
+            response["headers"].update({"Location": f"https://{host}/{repo.path}/{id}"})
 
     return response
 

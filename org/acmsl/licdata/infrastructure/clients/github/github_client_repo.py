@@ -128,6 +128,4 @@ class GithubClientRepo(ClientRepo):
         :return: The list of all clients.
         :rtype: List
         """
-        print(f"Requesting {self._github_repo}.list()")
-        GithubClientRepo.logger().debug(f"Requesting {self._github_repo}.list()")
         return self._github_repo.list()

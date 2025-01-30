@@ -23,10 +23,14 @@ import azure.functions as func
 
 bp = func.Blueprint()
 
+from pythoneda.shared.infrastructure.azure.functions import get_pythoneda_app
+
 
 @bp.function_name(name="CreateClient")
-@bp.route(route="clients/create", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def create_client(req: func.HttpRequest) -> func.HttpResponse:
+@bp.route(route="clients", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+async def create_client(
+    req: func.HttpRequest, context: func.Context
+) -> func.HttpResponse:
     """
     Azure Function to create a new client.
     :param req: The Azure Function HTTP request.
@@ -36,9 +40,29 @@ def create_client(req: func.HttpRequest) -> func.HttpResponse:
     :return: The response.
     :rtype: azure.functions.HttpResponse
     """
-    return func.HttpResponse(
-        "This HTTP triggered function executed successfully.", status_code=200
+    from pythoneda.shared import Ports
+    from org.acmsl.licdata import ClientRepo
+    import org.acmsl.licdata.infrastructure.clients.common as common
+    import org.acmsl.licdata.infrastructure.rest as rest
+
+    client_repo = Ports.instance().resolve_first(ClientRepo)
+    ClientRepo.logger().info("Creating a new client.")
+
+    event = {
+        "httpMethod": "GET",
+        "queryStringParameters": req.params,
+        "headers": req.headers,
+        "body": {},
+    }
+
+    resp = rest.create(
+        event,
+        context,
+        common.retrieve_pk,
+        common.retrieve_attributes,
+        client_repo,
     )
+    return func.HttpResponse(resp["body"], status_code=resp["statusCode"])
 
 
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et
