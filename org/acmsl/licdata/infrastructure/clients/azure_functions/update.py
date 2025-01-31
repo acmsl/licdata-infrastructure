@@ -1,10 +1,9 @@
-# vim: set fileencoding=utf-8
 """
-org/acmsl/licdata/infrastructure/azure/clients/create.py
+org/acmsl/licdata/infrastructure/clients/azure_functions/update.py
 
-This file defines the Create-Client script for Azure.
+This file provides an Azure Functions handler to update existing clients.
 
-Copyright (C) 2024-today acm-sl's licdata
+Copyright (C) 2023-today ACM S.L. Licdata
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,14 +18,15 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+
 import azure.functions as func
 
 bp = func.Blueprint()
 
 
-@bp.function_name(name="CreateClient")
-@bp.route(route="clients", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-async def create_client(
+@bp.function_name(name="UpdateClient")
+@bp.route(route="clients/{id}", methods=["PUT"], auth_level=func.AuthLevel.ANONYMOUS)
+async def update_client(
     req: func.HttpRequest, context: func.Context
 ) -> func.HttpResponse:
     """
@@ -44,21 +44,18 @@ async def create_client(
     import org.acmsl.licdata.infrastructure.rest as rest
 
     client_repo = Ports.instance().resolve_first(ClientRepo)
+    ClientRepo.logger().info("Updating a client.")
 
     event = {
-        "httpMethod": "POST",
+        "httpMethod": "PUT",
         "queryStringParameters": req.params,
+        "pathParameters": req.route_params,
         "headers": req.headers,
-        "body": {},
+        "body": req.get_json(),
     }
 
-    resp = rest.create(
-        event,
-        context,
-        common.retrieve_pk,
-        common.retrieve_attributes,
-        client_repo,
-    )
+    resp = rest.update(event, context, common.retrieve_attributes, client_repo)
+
     return func.HttpResponse(resp["body"], status_code=resp["statusCode"])
 
 
