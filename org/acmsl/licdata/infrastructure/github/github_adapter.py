@@ -154,7 +154,7 @@ def find_by_attributes(filter: Dict, path: str) -> List:
 
 
 def insert(
-    entity: Entity,
+    event: Entity,
     path: str,
     primaryKey: List,
     filterKeys: List,
@@ -178,12 +178,14 @@ def insert(
     :return: The id of the persisted entity.
     :rtype: str
     """
-    result = new_id()
-    created = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    result = event.id
+    now = datetime.now()
+    created = now.strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = now.timestamp()
     data = None
     insert_new_file = False
     item = {}
-    entity_attrs = entity.to_dict()
+    entity_attrs = event.to_dict()
     for attribute in primaryKey + filterKeys:
         value = entity_attrs.get(attribute, None)
         if attribute in encryptedAttributes:
@@ -230,11 +232,17 @@ def insert(
         item["id"] = result
         item["_created"] = created
         item.pop("_updated", None)
-        print(f"Inserting {item} in {path}/{result}/data.json")
         create_file(
             f"{path}/{result}/data.json",
             json.dumps(item),
             f"Created a new entry {result} in {path} collection",
+        )
+        item = event.to_dict()
+        item["_type"] = "org.acmsl.licdata.events.client.NewClientCreated"
+        create_file(
+            f"{path}/{result}/_events/{timestamp}-new_client_created.json",
+            json.dumps(item),
+            f"Created a new entry {timestamp}-new_client_created.json in {path}/{result}/_events/ collection",
         )
 
     return result

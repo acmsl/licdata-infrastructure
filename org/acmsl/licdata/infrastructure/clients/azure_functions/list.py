@@ -40,22 +40,52 @@ async def list_clients(
     :rtype: azure.functions.HttpResponse
     """
 
-    from pythoneda.shared import Ports
-    from org.acmsl.licdata import ClientRepo
-    import org.acmsl.licdata.infrastructure.rest as rest
+    """
+    Azure Function to create a new client.
+    :param req: The Azure Function HTTP request.
+    :type req: azure.functions.HttpRequest
+    :param context: The Azure Function context.
+    :type context: azure.functions.Context
+    :return: The response.
+    :rtype: azure.functions.HttpResponse
+    """
+    from pythoneda.shared.infrastructure.azure.functions import get_pythoneda_app
+    from pythoneda.shared.infrastructure.http import HttpMethod
+    from org.acmsl.licdata.events.clients import (
+        NewClientRequested,
+    )
+    from org.acmsl.licdata.events.infrastructure.http.clients import (
+        HttpClientEventFactory,
+        HttpListClientsRequested,
+    )
 
-    client_repo = Ports.instance().resolve_first(ClientRepo)
+    event = HttpListClientsRequested(
+        httpMethod=HttpMethod.POST,
+        queryStringParameters=req.params,
+        headers=req.headers,
+        pathParameters=req.route_params,
+        body={},  # req.get_json(),
+    ).to_event()
 
-    event = {
-        "httpMethod": "GET",
-        "queryStringParameters": req.params,
-        "headers": req.headers,
-        "body": {},
-    }
+    app = get_pythoneda_app()
 
-    resp = rest.list(event, context, Ports.instance().resolve_first(ClientRepo))
+    resulting_event = None
+    resulting_events = await app.accept(event)
 
-    return func.HttpResponse(resp["body"], status_code=resp["statusCode"])
+    if len(resulting_events) > 0:
+        resulting_event = resulting_events[0]
+
+    outcome = HttpClientEventFactory.instance().from_list_clients_requested(
+        resulting_event, event
+    )
+
+    return func.HttpResponse(
+        outcome.body,
+        status_code=outcome.status_code,
+        mimetype=outcome.mime_type,
+        headers=outcome.headers,
+        charset=outcome.charset,
+    )
 
 
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et

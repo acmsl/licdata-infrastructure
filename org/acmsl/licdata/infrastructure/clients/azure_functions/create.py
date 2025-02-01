@@ -61,7 +61,6 @@ async def create_client(
     resulting_event = None
     resulting_events = await app.accept(event)
 
-    print(f"resulting_events: {resulting_events}")
     if len(resulting_events) > 0:
         resulting_event = resulting_events[0]
 
