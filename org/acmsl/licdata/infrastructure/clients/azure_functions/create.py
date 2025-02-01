@@ -38,28 +38,44 @@ async def create_client(
     :return: The response.
     :rtype: azure.functions.HttpResponse
     """
-    from pythoneda.shared import Ports
-    from org.acmsl.licdata import ClientRepo
-    import org.acmsl.licdata.infrastructure.clients.common as common
-    import org.acmsl.licdata.infrastructure.rest as rest
-
-    client_repo = Ports.instance().resolve_first(ClientRepo)
-
-    event = {
-        "httpMethod": "POST",
-        "queryStringParameters": req.params,
-        "headers": req.headers,
-        "body": {},
-    }
-
-    resp = rest.create(
-        event,
-        context,
-        common.retrieve_pk,
-        common.retrieve_attributes,
-        client_repo,
+    from pythoneda.shared.infrastructure.azure.functions import get_pythoneda_app
+    from pythoneda.shared.infrastructure.http import HttpMethod
+    from org.acmsl.licdata.events.clients import (
+        NewClientRequested,
     )
-    return func.HttpResponse(resp["body"], status_code=resp["statusCode"])
+    from org.acmsl.licdata.events.infrastructure.http.clients import (
+        HttpClientEventFactory,
+        HttpNewClientRequested,
+    )
+
+    event = HttpNewClientRequested(
+        httpMethod=HttpMethod.POST,
+        queryStringParameters=req.params,
+        headers=req.headers,
+        pathParameters=req.route_params,
+        body=req.get_json(),
+    ).to_event()
+
+    app = get_pythoneda_app()
+
+    resulting_event = None
+    resulting_events = await app.accept(event)
+
+    print(f"resulting_events: {resulting_events}")
+    if len(resulting_events) > 0:
+        resulting_event = resulting_events[0]
+
+    outcome = HttpClientEventFactory.instance().from_new_client_requested(
+        resulting_event, event
+    )
+
+    return func.HttpResponse(
+        outcome.body,
+        status_code=outcome.status_code,
+        mimetype=outcome.mime_type,
+        headers=outcome.headers,
+        charset=outcome.charset,
+    )
 
 
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et

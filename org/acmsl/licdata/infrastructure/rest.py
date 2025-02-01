@@ -19,13 +19,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from pythoneda.shared import Repo
+from pythoneda.shared import Event, Repo
 
-from .params import load_body, retrieve_param, retrieve_id
 from .resp import build_response
 import inspect
 from datetime import datetime
-from typing import Dict, Callable, List
+from typing import Any, Dict, Callable, List, Tuple, Type
 
 
 def retrieve_attributes_from_params(body: Dict, event, attributeNames: List) -> Dict:
@@ -84,33 +83,47 @@ def find_by_id(event, context, repo):
 
 
 def create(
-    event, context, retrievePk: Callable, retrieveAttributes: Callable, repo: Repo
-) -> Dict:
+    createResourceEvent: Dict,
+    context,
+    retrievePk: Callable,
+    retrieveAttributes: Callable,
+    repo: Repo,
+    resourceCreatedEventClass: Type[Event],
+    invalidCreationRequestEventClass: Type[Event],
+    resourceAlreadyExistsEventClass: Type[Event],
+) -> Event:
     """
     Creates a new entity using given repo.
-    :param event: The AWS Lambda event.
-    :type event: event
-    :param context: The AWS Lambda context.
-    :type context: context
+    :param createResourceEvent: The AWS Lambda createResourceEvent.
+    :type createResourceEvent: Dict
+    :param context: The context.
+    :type context: Any
     :param retrievePk: The function to retrieve the primary key.
     :type retrievePk: Callable
     :param retrieveAttributes: The function to retrieve the attributes.
     :type retrieveAttributes: Callable
     :param repo: The entity repository.
-    :type repo: pythoneda.Repo
-    :return: The response.
-    :rtype: Dict
+    :type repo: pythoneda.shared.Repo
+    :param resourceCreatedEventClass: The class of the event to return when the resource is created.
+    :type resourceCreatedEventClass: Type[Event]
+    :param invalidCreationRequestEventClass: The class of the event to return when the creation request is invalid.
+    :type invalidCreationRequestEventClass: Type[Event]
+    :param resourceAlreadyExistsEventClass: The class of the event to return when the resource already exists.
+    :type resourceAlreadyExistsEventClass: Type[Event]
+    :return: The resulting event.
+    :rtype: Event
     """
     status = 200
 
-    (body, error) = load_body(event)
+    (body, error) = createResourceEvent.extract_body()
     if error:
         status = 500
         resp_body = {"error": "Cannot parse body"}
-        response = build_response(status, resp_body, event, context)
+        response = build_response(status, resp_body, createResourceEvent, context)
+        result = invalidCreationRequestEventClass(500, response, createResourceEvent)
     else:
-        pk = retrievePk(body, event)
-        attributes = retrieveAttributes(body, event)
+        pk = retrievePk(body, createResourceEvent)
+        attributes = retrieveAttributes(body, createResourceEvent)
 
         (item, sha) = repo.find_by_pk(pk)
         if item:
@@ -120,21 +133,23 @@ def create(
             resp_body.update({"id": item["id"]})
             if "_created" in item:
                 resp_body.update({"_created": item["_created"]})
-            response = build_response(status, resp_body, event, context)
+            response = build_response(status, resp_body, createResourceEvent, context)
+            result = resourceAlreadyExistsEventClass(409, response, createResourceEvent)
         else:
             attributes["_created"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             attributes.pop("_updated", None)
             id = repo.insert(attributes)
-            headers = event.get("headers", {})
-            host = headers.get("host", event.get("host", ""))
+            headers = createResourceEvent.get("headers", {})
+            host = headers.get("host", createResourceEvent.get("host", ""))
             status = 201
             resp_body = {}
             resp_body.update(attributes)
             resp_body.update({"id": id})
-            response = build_response(status, resp_body, event, context)
+            response = build_response(status, resp_body, createResourceEvent, context)
             response["headers"].update({"Location": f"https://{host}/{repo.path}/{id}"})
+            result = resourceCreatedEventClass(createResourceEvent, 201, response)
 
-    return response
+    return result
 
 
 def update(event, context, retrieveAttributes: Callable, repo: Repo):

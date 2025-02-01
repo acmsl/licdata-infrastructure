@@ -22,7 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/users/>.
 import inspect
 from org.acmsl.licdata.infrastructure.github import github_adapter
 from pythoneda.shared import BaseObject
-from typing import Dict, List, Type
+from typing import Dict, List, Type, Optional
 
 
 class GithubRepo(BaseObject):
@@ -213,13 +213,13 @@ class GithubRepo(BaseObject):
         """
         return github_adapter.delete(id, self._path)
 
-    def find_by_pk(self, pk: Dict):
+    def find_by_pk(self, pk: Dict) -> Optional[object]:
         """
         Finds the item matching given primary key.
         :param pk: The primary key.
         :type pk: Dict
         :return: The item.
-        :rtype: object
+        :rtype: Optional[object]
         """
         return github_adapter.find_by_attributes(pk, self._path)
 

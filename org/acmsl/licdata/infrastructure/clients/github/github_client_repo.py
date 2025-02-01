@@ -22,7 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from org.acmsl.licdata import Client, ClientRepo
 from org.acmsl.licdata.infrastructure.github import GithubRepo
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
 class GithubClientRepo(ClientRepo):
@@ -112,13 +112,13 @@ class GithubClientRepo(ClientRepo):
         """
         return self._github_repo.delete(id)
 
-    def find_by_pk(self, pk: Dict):
+    def find_by_pk(self, pk: Dict) -> Optional[Client]:
         """
         Retrieves a Client by its primary key.
         :param pk: The primary key attributes.
         :type pk: Dict
         :return: The client matching given criteria.
-        :rtype: Client from domain.client
+        :rtype: Optional[org.acmsl.licdata.Client]
         """
         return self._github_repo.find_by_pk(pk)
 

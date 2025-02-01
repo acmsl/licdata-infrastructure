@@ -20,9 +20,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 from org.acmsl.licdata import Client
+from org.acmsl.licdata.events.infrastructure.http.clients import (
+    HttpNewClientCreated,
+    HttpInvalidNewClientRequest,
+    HttpClientAlreadyExists,
+)
 import org.acmsl.licdata.infrastructure.rest as rest
-
-from typing import Dict, List
+from pythoneda.shared import Event
+from typing import Dict, List, Type
 
 
 def retrieve_pk(body: Dict, event) -> List:
@@ -49,3 +54,30 @@ def retrieve_attributes(body: Dict, event) -> List:
     :rtype: Dict
     """
     return rest.retrieve_attributes_from_params(body, event, Client.attributes())
+
+
+def resource_created_event_class() -> Type[Event]:
+    """
+    Retrieves the class of the "resource created" event.
+    :return: The class.
+    :type: Type[Event]
+    """
+    return HttpNewClientCreated
+
+
+def invalid_new_resource_request_event_class() -> Type[Event]:
+    """
+    Retrieves the class of the "invalid creation request" event.
+    :return: The class.
+    :type: Type[Event]
+    """
+    return HttpInvalidNewClientRequest
+
+
+def resource_already_exists_event_class() -> Type[Event]:
+    """
+    Retrieves the class of the "resource already exists" event.
+    :return: The class.
+    :type: Type[Event]
+    """
+    return HttpClientAlreadyExists

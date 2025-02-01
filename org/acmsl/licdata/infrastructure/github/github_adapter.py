@@ -19,12 +19,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from org.acmsl.licdata.infrastructure.crypt_utils import encrypt
-
-from .github_raw import get_contents, create_file, update_file, delete_file
-from uuid import uuid4
-import json
 from datetime import datetime
+from .github_raw import get_contents, create_file, update_file, delete_file
+import json
+from org.acmsl.licdata.infrastructure.crypt_utils import encrypt
+from pythoneda.shared import Entity
+from uuid import uuid4
 from typing import Dict, List
 
 
@@ -47,21 +47,19 @@ def find_by_id(id: str, path: str):
     :return: The tuple (item, sha)
     :rtype: tuple
     """
-    item = None
+    result = None
 
     data = None
 
-    sha = None
-
     try:
-        (data, sha) = get_contents(f"{path}/{id}/data.json")
+        (data, _) = get_contents(f"{path}/{id}/data.json")
     except:
         data = None
 
     if data:
-        item = json.loads(data)
+        result = json.loads(data)
 
-    return (item, sha)
+    return result
 
 
 def find_all_by_attributes(filter: Dict, path: str):
@@ -76,10 +74,8 @@ def find_all_by_attributes(filter: Dict, path: str):
     """
     result = []
 
-    sha = None
-
     try:
-        (all_items, sha) = get_contents(f"{path}/data.json")
+        (all_items, _) = get_contents(f"{path}/data.json")
     except:
         all_items = None
     if all_items:
@@ -91,8 +87,7 @@ def find_all_by_attributes(filter: Dict, path: str):
             x for x in all_items_content if _attributes_match(x, item, filter.keys())
         ]
 
-    print(f"find_all_by_attributes({filter}, {path}) -> {result}")
-    return (result, sha)
+    return result
 
 
 def find_all_by_attribute(attributeValue: str, attributeName: str, path: str):
@@ -126,17 +121,17 @@ def find_by_attribute(attributeValue: str, attributeName: str, path):
     """
     result = None
 
-    (items, sha) = find_all_by_attribute(attributeValue, attributeName, path)
+    matches = find_all_by_attribute(attributeValue, attributeName, path)
 
-    if items:
-        result = items[0]
+    if matches:
+        result = matches[0]
     else:
         print(f"No {path} with {attributeName} {attributeValue}")
 
-    return (result, sha)
+    return result
 
 
-def find_by_attributes(filter: Dict, path):
+def find_by_attributes(filter: Dict, path: str) -> List:
     """
     Finds an item matching given attribute filter.
     :param filter: The attribute filter.
@@ -148,18 +143,18 @@ def find_by_attributes(filter: Dict, path):
     """
     result = None
 
-    (items, sha) = find_all_by_attributes(filter, path)
+    matches = find_all_by_attributes(filter, path)
 
-    if items:
-        result = items[0]
+    if matches:
+        result = matches[0]
     else:
         print(f"No {path} found matching {filter}")
 
-    return (result, sha)
+    return result
 
 
 def insert(
-    entity,
+    entity: Entity,
     path: str,
     primaryKey: List,
     filterKeys: List,
@@ -169,7 +164,7 @@ def insert(
     """
     Inserts a new entity.
     :param entity: The entity to persist.
-    :type entity: ValueObject from pythoneda.value_object
+    :type entity: pythoneda.shared.Entity
     :param path: The relative path.
     :type path: str
     :param primaryKey: The entity's primary key.
@@ -188,8 +183,9 @@ def insert(
     data = None
     insert_new_file = False
     item = {}
+    entity_attrs = entity.to_dict()
     for attribute in primaryKey + filterKeys:
-        value = entity.get(attribute, None)
+        value = entity_attrs.get(attribute, None)
         if attribute in encryptedAttributes:
             value = encrypt(value)
         item[attribute] = value
@@ -210,7 +206,7 @@ def insert(
         insert_new_file = True
     else:
         content = json.loads(data)
-        entries = [x for x in content if _attributes_match(x, entity, primaryKey)]
+        entries = [x for x in content if _attributes_match(x, entity_attrs, primaryKey)]
         if len(entries) == 0:
             content.append(item)
             update_file(
@@ -227,7 +223,7 @@ def insert(
     if insert_new_file:
         item = {}
         for attribute in attributeNames:
-            value = entity.get(attribute, None)
+            value = entity_attrs.get(attribute, None)
             if attribute in encryptedAttributes:
                 value = encrypt(value)
             item[attribute] = value
@@ -258,21 +254,22 @@ def get_property_name(property) -> str:
         return property.fget.__name__
 
 
-def _attributes_match(item, target, attributeNames: List):
+def _attributes_match(item: Dict, target: Dict, attributeNames: List[str]):
     """
     Checks if two entities share the same attributes.
     :param item: The first entity.
-    :type item: ValueObject from pythoneda.value_object
+    :type item: Dict
     :param target: The second entity.
-    :type target: ValueObject from pythoneda.value_object
+    :type target: Dict
     :param attributeNames: The attributes to check.
+    :type attributeNames: List[str]
     :return: True if they share the same attributes.
     :rtype: bool
     """
     result = True
 
     for attribute_name in attributeNames:
-        if item.get(attribute_name) != target.get(attribute_name):
+        if item.get(attribute_name, None) != target.get(attribute_name, None):
             result = False
             break
 
@@ -364,7 +361,7 @@ def delete(id: str, path: str):
     result = False
 
     try:
-        (data, sha) = get_contents(f"{path}/data.json")
+        (data, _) = get_contents(f"{path}/data.json")
     except:
         data = None
     if data:
@@ -391,15 +388,8 @@ def list(path: str) -> List:
     :return: The list of all items.
     :rtype: List
     """
-    result = []
-    sha = None
-
-    print(f"Calling get_contents({path}/data.json)")
-    (data, sha) = get_contents(f"{path}/data.json")
-    print(f"{path}/data.json -> {data}")
-    result = json.loads(data)
-
-    return (result, sha)
+    (data, _) = get_contents(f"{path}/data.json")
+    return json.loads(data)
 
 
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et
