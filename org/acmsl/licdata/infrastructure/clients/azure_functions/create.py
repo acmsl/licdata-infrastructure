@@ -44,7 +44,7 @@ async def create_client(
         NewClientRequested,
     )
     from org.acmsl.licdata.events.infrastructure.http.clients import (
-        HttpClientEventFactory,
+        HttpClientResponseFactory,
         HttpNewClientRequested,
     )
 
@@ -64,7 +64,7 @@ async def create_client(
     if len(resulting_events) > 0:
         resulting_event = resulting_events[0]
 
-    outcome = HttpClientEventFactory.instance().from_new_client_requested(
+    outcome = HttpClientResponseFactory.instance().from_new_client_requested(
         resulting_event, event
     )
 

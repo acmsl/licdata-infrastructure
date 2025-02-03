@@ -21,8 +21,8 @@ along with this program.  If not, see <https://www.gnu.org/users/>.
 
 import inspect
 from org.acmsl.licdata.infrastructure.github import github_adapter
-from pythoneda.shared import BaseObject
-from typing import Dict, List, Type, Optional
+from pythoneda.shared import BaseObject, Entity, Event
+from typing import Callable, Dict, List, Tuple, Type, Optional
 
 
 class GithubRepo(BaseObject):
@@ -169,21 +169,28 @@ class GithubRepo(BaseObject):
         """
         return github_adapter.find_by_attributes(filter, self._path)
 
-    def insert(self, item) -> bool:
+    def insert(
+        self,
+        newEntityRequested: Event,
+        buildNewEntity: Callable[[Event], Tuple[Entity, Event]],
+    ) -> Event:
         """
-        Inserts a new item.
-        :param item: The item to persist.
-        :type item: object
-        :return: True if the item gets persisted.
-        :rtype: bool
+        Inserts a new entity.
+        :param newEntityRequested: The event.
+        :type newEntityRequested: pythoneda.shared.Event
+        :param buildNewEntity: A function to create the new-entity-created e.
+        :type buildNewEntity: callable[[pythoneda.shared.Entity], pythoneda.shared.Event]
+        :return: The new-entity-created event if the entity gets persisted.
+        :rtype: pythoneda.shared.Event
         """
         return github_adapter.insert(
-            item,
-            self._path,
-            self._primary_key,
-            self._filter_attributes,
-            self._attributes,
-            self._sensitive_attributes,
+            newEntityRequested=newEntityRequested,
+            buildNewEntity=buildNewEntity,
+            path=self._path,
+            primaryKey=self._primary_key,
+            filterKeys=self._filter_attributes,
+            attributeNames=self._attributes,
+            sensitiveAttributes=self._sensitive_attributes,
         )
 
     def update(self, item) -> bool:
@@ -203,15 +210,36 @@ class GithubRepo(BaseObject):
             self._sensitive_attributes,
         )
 
-    def delete(self, id: str) -> bool:
+    def delete(self, id: str) -> object:
         """
         Deletes an item.
         :param id: The id of the item to delete.
         :type id: str
-        :return: True if the item gets deleted.
-        :rtype: bool
+        :return: The deleted item, if the operation succeeds.
+        :rtype: object
         """
-        return github_adapter.delete(id, self._path)
+        return github_adapter.delete(
+            id,
+            self._path,
+            self._attributes,
+            self._sensitive_attributes,
+        )
+
+    def delete_by_pk(self, primaryKey: List) -> object:
+        """
+        Deletes an item.
+        :param primaryKey: The primary key of the item to delete.
+        :type primaryKey: List
+        :return: The deleted item, if the operation succeeds.
+        :rtype: object
+        """
+        return github_adapter.delete(
+            primaryKey,
+            self._path,
+            self._primary_key,
+            self._attributes,
+            self._sensitive_attributes,
+        )
 
     def find_by_pk(self, pk: Dict) -> Optional[object]:
         """

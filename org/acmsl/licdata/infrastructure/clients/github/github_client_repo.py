@@ -20,9 +20,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 from org.acmsl.licdata import Client, ClientRepo
+from org.acmsl.licdata.events.clients import NewClientCreated, NewClientRequested
 from org.acmsl.licdata.infrastructure.github import GithubRepo
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 
 class GithubClientRepo(ClientRepo):
@@ -86,13 +87,41 @@ class GithubClientRepo(ClientRepo):
         """
         return self._github_repo.filter(dictionary)
 
-    def insert(self, item):
+    def insert(self, newClientRequested: NewClientRequested) -> NewClientCreated:
         """
         Inserts a new Client.
-        :param item: The client.
-        :type item: Client from domain.client
+        :param newClientRequested: The event.
+        :type newClientRequested: org.acmsl.licdata.events.clients.NewClientRequested
         """
-        return self._github_repo.insert(item)
+        return self._github_repo.insert(newClientRequested, self._build_new_client)
+
+    def _build_new_client(
+        self, newClientRequested: NewClientRequested
+    ) -> Tuple[Client, NewClientCreated]:
+        """
+        Builds a new Client.
+        :param newClientRequested: The event.
+        :type newClientRequested: org.acmsl.licdata.events.clients.NewClientRequested
+        :return: The new client and the event.
+        :rtype: Tuple[org.acmsl.licdata.Client, org.acmsl.licdata.events.clients.NewClientCreated]
+        """
+        new_client = Client(
+            email=newClientRequested.email,
+            address=newClientRequested.address,
+            contact=newClientRequested.contact,
+            phone=newClientRequested.phone,
+        )
+        new_client_created = NewClientCreated(
+            id=new_client.id,
+            email=newClientRequested.email,
+            address=newClientRequested.address,
+            contact=newClientRequested.contact,
+            phone=newClientRequested.phone,
+            previousEventIds=(
+                newClientRequested.previous_event_ids + [newClientRequested.id]
+            ),
+        )
+        return (new_client, new_client_created)
 
     def update(self, item):
         """
@@ -120,7 +149,14 @@ class GithubClientRepo(ClientRepo):
         :return: The client matching given criteria.
         :rtype: Optional[org.acmsl.licdata.Client]
         """
-        return self._github_repo.find_by_pk(pk)
+        result = None
+
+        match = self._github_repo.find_by_pk(pk)
+
+        if match is not None:
+            result = Client.from_dict(match)
+
+        return result
 
     def list(self) -> List:
         """

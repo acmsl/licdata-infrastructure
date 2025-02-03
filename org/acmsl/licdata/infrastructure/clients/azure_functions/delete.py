@@ -1,9 +1,10 @@
+# vim: set fileencoding=utf-8
 """
-org/acmsl/licdata/infrastructure/clients/azure_functions/delete.py
+org/acmsl/licdata/infrastructure/azure/clients/delete.py
 
-This file provides an Azure Functions handler to delete existing clients.
+This file defines the Delete-Clients script for Azure.
 
-Copyright (C) 2023-today ACM S.L. Licdata
+Copyright (C) 2024-today acm-sl's licdata
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -18,19 +19,19 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-
 import azure.functions as func
+
 
 bp = func.Blueprint()
 
 
-@bp.function_name(name="DeleteClient")
+@bp.function_name(name="DeleteClients")
 @bp.route(route="clients/{id}", methods=["DELETE"], auth_level=func.AuthLevel.ANONYMOUS)
 async def delete_client(
     req: func.HttpRequest, context: func.Context
 ) -> func.HttpResponse:
     """
-    Azure Function to create a new client.
+    Azure Function to delete an existing client.
     :param req: The Azure Function HTTP request.
     :type req: azure.functions.HttpRequest
     :param context: The Azure Function context.
@@ -38,25 +39,43 @@ async def delete_client(
     :return: The response.
     :rtype: azure.functions.HttpResponse
     """
-    from pythoneda.shared import Ports
-    from org.acmsl.licdata import ClientRepo
-    import org.acmsl.licdata.infrastructure.clients.common as common
-    import org.acmsl.licdata.infrastructure.rest as rest
+    from pythoneda.shared.infrastructure.azure.functions import get_pythoneda_app
+    from pythoneda.shared.infrastructure.http import HttpMethod
+    from org.acmsl.licdata.events.clients import (
+        DeleteClientRequested,
+    )
+    from org.acmsl.licdata.events.infrastructure.http.clients import (
+        HttpClientResponseFactory,
+        HttpDeleteClientRequested,
+    )
 
-    client_repo = Ports.instance().resolve_first(ClientRepo)
-    ClientRepo.logger().info("Deleting a client.")
+    event = HttpDeleteClientRequested(
+        httpMethod=HttpMethod.DELETE,
+        queryStringParameters=req.params,
+        headers=req.headers,
+        pathParameters=req.route_params,
+        body={},  # req.get_json(),
+    ).to_event()
 
-    event = {
-        "httpMethod": "DELETE",
-        "queryStringParameters": req.params,
-        "pathParameters": req.route_params,
-        "headers": req.headers,
-        "body": {},
-    }
+    app = get_pythoneda_app()
 
-    resp = rest.delete(event, context, client_repo)
+    resulting_event = None
+    resulting_events = await app.accept(event)
 
-    return func.HttpResponse(resp["body"], status_code=resp["statusCode"])
+    if len(resulting_events) > 0:
+        resulting_event = resulting_events[0]
+
+    outcome = HttpClientResponseFactory.instance().from_delete_client_requested(
+        resulting_event, event
+    )
+
+    return func.HttpResponse(
+        outcome.body,
+        status_code=outcome.status_code,
+        mimetype=outcome.mime_type,
+        headers=outcome.headers,
+        charset=outcome.charset,
+    )
 
 
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et

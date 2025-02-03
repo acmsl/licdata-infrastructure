@@ -39,23 +39,10 @@ async def list_clients(
     :return: The response.
     :rtype: azure.functions.HttpResponse
     """
-
-    """
-    Azure Function to create a new client.
-    :param req: The Azure Function HTTP request.
-    :type req: azure.functions.HttpRequest
-    :param context: The Azure Function context.
-    :type context: azure.functions.Context
-    :return: The response.
-    :rtype: azure.functions.HttpResponse
-    """
     from pythoneda.shared.infrastructure.azure.functions import get_pythoneda_app
     from pythoneda.shared.infrastructure.http import HttpMethod
-    from org.acmsl.licdata.events.clients import (
-        NewClientRequested,
-    )
     from org.acmsl.licdata.events.infrastructure.http.clients import (
-        HttpClientEventFactory,
+        HttpClientResponseFactory,
         HttpListClientsRequested,
     )
 
@@ -75,7 +62,7 @@ async def list_clients(
     if len(resulting_events) > 0:
         resulting_event = resulting_events[0]
 
-    outcome = HttpClientEventFactory.instance().from_list_clients_requested(
+    outcome = HttpClientResponseFactory.instance().from_list_clients_requested(
         resulting_event, event
     )
 

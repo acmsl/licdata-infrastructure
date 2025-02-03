@@ -23,9 +23,9 @@ from datetime import datetime
 from .github_raw import get_contents, create_file, update_file, delete_file
 import json
 from org.acmsl.licdata.infrastructure.crypt_utils import encrypt
-from pythoneda.shared import Entity
+from pythoneda.shared import camel_to_snake, Entity, Event
 from uuid import uuid4
-from typing import Dict, List
+from typing import Callable, Dict, List, Tuple
 
 
 def new_id() -> str:
@@ -154,17 +154,20 @@ def find_by_attributes(filter: Dict, path: str) -> List:
 
 
 def insert(
-    event: Entity,
+    newEntityRequested: Event,
+    buildNewEntity: Callable[[Event], Tuple[Entity, Event]],
     path: str,
     primaryKey: List,
     filterKeys: List,
     attributeNames: List,
-    encryptedAttributes: List,
-):
+    sensitiveAttributes: List,
+) -> str:
     """
     Inserts a new entity.
-    :param entity: The entity to persist.
-    :type entity: pythoneda.shared.Entity
+    :param newEntityRequested: The event requesting the new entity.
+    :type newEntityRequested: pythoneda.shared.Event
+    :param buildNewEntity: A function to create the new-entity-created e.
+    :type buildNewEntity: callable[[pythoneda.shared.Event], Tuple[pythoneda.shared.Entity, pythoneda.shared.Event]]
     :param path: The relative path.
     :type path: str
     :param primaryKey: The entity's primary key.
@@ -173,25 +176,15 @@ def insert(
     :type filterKeys: List
     :param attributeNames: The entity's attribute names.
     :type attributeNames: List
-    :param encryptedAttributes: The names of the attributes that need to be encrypted.
-    :type encryptedAttributes: List
+    :param sensitiveAttributes: The names of the attributes that need to be encrypted.
+    :type sensitiveAttributes: List
     :return: The id of the persisted entity.
     :rtype: str
     """
-    result = event.id
-    now = datetime.now()
-    created = now.strftime("%Y-%m-%d %H:%M:%S")
-    timestamp = now.timestamp()
+    entity, result = buildNewEntity(newEntityRequested)
+
     data = None
     insert_new_file = False
-    item = {}
-    entity_attrs = event.to_dict()
-    for attribute in primaryKey + filterKeys:
-        value = entity_attrs.get(attribute, None)
-        if attribute in encryptedAttributes:
-            value = encrypt(value)
-        item[attribute] = value
-    item["id"] = result
 
     try:
         (data, sha) = get_contents(f"{path}/data.json")
@@ -199,22 +192,24 @@ def insert(
         data = None
     if data is None:
         content = []
-        content.append(item)
+        content.append(entity.to_dict_simplified())
         create_file(
             f"{path}/data.json",
             json.dumps(content),
-            f"First instance in {path} collection: {result}",
+            f"First instance in {path} collection: {entity.id}",
         )
         insert_new_file = True
     else:
         content = json.loads(data)
-        entries = [x for x in content if _attributes_match(x, entity_attrs, primaryKey)]
+        entries = [
+            x for x in content if _attributes_match(x, entity.to_dict(), primaryKey)
+        ]
         if len(entries) == 0:
-            content.append(item)
+            content.append(entity.to_dict_simplified())
             update_file(
                 f"{path}/data.json",
                 json.dumps(content),
-                f"Updated {result} in {path} collection",
+                f"Updated {entity.id} in {path} collection",
                 sha,
             )
             insert_new_file = True
@@ -223,26 +218,23 @@ def insert(
             insert_new_file = False
 
     if insert_new_file:
-        item = {}
-        for attribute in attributeNames:
-            value = entity_attrs.get(attribute, None)
-            if attribute in encryptedAttributes:
-                value = encrypt(value)
-            item[attribute] = value
-        item["id"] = result
-        item["_created"] = created
-        item.pop("_updated", None)
         create_file(
-            f"{path}/{result}/data.json",
-            json.dumps(item),
-            f"Created a new entry {result} in {path} collection",
+            f"{path}/{entity.id}/data.json",
+            entity.to_json(),
+            f"Created a new entry {entity.id} in {path} collection",
         )
-        item = event.to_dict()
-        item["_type"] = "org.acmsl.licdata.events.client.NewClientCreated"
+        entity_name = camel_to_snake(entity.__class__.__name__)
+        timestamp = datetime.now().timestamp()
         create_file(
-            f"{path}/{result}/_events/{timestamp}-new_client_created.json",
-            json.dumps(item),
-            f"Created a new entry {timestamp}-new_client_created.json in {path}/{result}/_events/ collection",
+            f"{path}/{entity.id}/_events/{timestamp}-new_{entity_name}_requested.json",
+            newEntityRequested.to_json(),
+            f"Created a new entry {timestamp}-new_{entity_name}_requested.json in {path}/{entity.id}/_events/ collection",
+        )
+        timestamp = datetime.now().timestamp()
+        create_file(
+            f"{path}/{entity.id}/_events/{timestamp}-new_{entity_name}_created.json",
+            result.to_json(),
+            f"Created a new entry {timestamp}-new_{entity_name}_created.json in {path}/{entity.id}/_events/ collection",
         )
 
     return result
@@ -290,7 +282,7 @@ def update(
     primaryKey: List,
     filterKeys: List,
     attributeNames: List,
-    encryptedAttributes: List,
+    sensitiveAttributes: List,
 ):
     """
     Updates given entity.
@@ -304,15 +296,15 @@ def update(
     :type filterKeys: List
     :param attributeNames: The entity's attribute names.
     :type attributeNames: List
-    :param encryptedAttributes: The names of the attributes that need to be encrypted.
-    :type encryptedAttributes: List
+    :param sensitiveAttributes: The names of the attributes that need to be encrypted.
+    :type sensitiveAttributes: List
     """
     id = entity.get("id")
     item = {}
     item["id"] = id
     for attribute in primaryKey + filterKeys:
         value = entity.get(attribute)
-        if attribute in encryptedAttributes:
+        if attribute in sensitiveAttributes:
             value = encrypt(value)
         item[attribute] = value
     try:
@@ -338,7 +330,7 @@ def update(
     if old_item:
         for attribute in attributeNames:
             value = entity.get(attribute)
-            if attribute in encryptedAttributes:
+            if attribute in sensitiveAttributes:
                 value = encrypt(value)
             item[attribute] = value
         item["id"] = id
@@ -356,18 +348,153 @@ def update(
     return item
 
 
-def delete(id: str, path: str):
+def delete(
+    id: str,
+    path: str,
+    attributeNames: List,
+    sensitiveAttributes: List,
+) -> Dict:
     """
     Deletes an item in the repository.
-    :param id: The id.
-    :type id: str
+    :param id: The id of the item to delete.
+    :type id: List
     :param path: The relative path.
     :type path: str
-    :return: True if the item gets removed.
-    :rtype: bool
+    :param attributeNames: The entity's attribute names.
+    :type attributeNames: List
+    :param sensitiveAttributes: The names of the attributes that need to be encrypted.
+    :type sensitiveAttributes: List
+    :return: The information about the removed item.
+    :rtype: Dict
     """
-    result = False
+    result = {}
+    now = datetime.now()
+    deleted = now.strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = now.timestamp()
+    data = None
+    delete_file = False
 
+    try:
+        (data, sha) = get_contents(f"{path}/data.json")
+    except:
+        data = None
+    if data is not None:
+        content = json.loads(data)
+        result = any([x for x in content if x.get("id", None) == id])
+        if entry is not None:
+            update_file(
+                f"{path}/data.json",
+                json.dumps([x for x in content if x != result]),
+                f"Deleted {id} in {path} collection",
+                sha,
+            )
+            delete_file = True
+        else:
+            print(f"Entity {id} does not exist in {path} collection")
+
+    if delete_file:
+        (data, sha) = get_contents(f"{path}/{id}/data.json")
+        json_data = json.loads(data)
+        result = json_data.copy()
+        result["_deleted"] = deleted
+        delete_file(f"{path}/{id}/data.json", f"Deleted {path}/{id}/data.json", sha)
+        result["_type"] = "org.acmsl.licdata.events.client.ClientDeleted"
+        create_file(
+            f"{path}/{entry.id}/_events/{timestamp}-client_deleted.json",
+            json.dumps(result),
+            f"Created a new entry {timestamp}-_client_deleted.json in {path}/{id}/_events/ collection",
+        )
+        result = json_data
+        for attribute in sensitiveAttributes:
+            value = entity.get(attribute)
+            result[attribute] = encrypt(result.get(attribute))
+
+    return result
+
+
+def delete_by_pk(
+    primaryKey: List,
+    path: str,
+    primaryKeyNames: List,
+    attributeNames: List,
+    sensitiveAttributes: List,
+) -> Dict:
+    """
+    Deletes an item in the repository.
+    :param primaryKey: The primary key of the item to delete.
+    :type primaryKey: List
+    :param path: The relative path.
+    :type path: str
+    :param primaryKeyNames: The entity's primary key.
+    :type primaryKeyNames: List
+    :param attributeNames: The entity's attribute names.
+    :type attributeNames: List
+    :param sensitiveAttributes: The names of the attributes that need to be encrypted.
+    :type sensitiveAttributes: List
+    :return: The information about the removed item.
+    :rtype: Dict
+    """
+    result = {}
+    now = datetime.now()
+    deleted = now.strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = now.timestamp()
+    data = None
+    delete_file = False
+    entry = {}
+    primary_key = primaryKey.to_dict()
+    for attribute in primaryKeyNames:
+        value = primary_key.get(attribute, None)
+        if attribute in sensitiveAttributes:
+            value = encrypt(value)
+        result[attribute] = value
+    result["id"] = result
+
+    try:
+        (data, sha) = get_contents(f"{path}/data.json")
+    except:
+        data = None
+    if data is not None:
+        content = json.loads(data)
+        entries = [
+            x for x in content if _attributes_match(x, primary_key, primaryKeyNames)
+        ]
+        if len(entries) > 0:
+            entry = entries[0]
+            update_file(
+                f"{path}/data.json",
+                json.dumps([x for x in entries if x != entry]),
+                f"Deleted {result} in {path} collection",
+                sha,
+            )
+            delete_file = True
+        else:
+            print(f"Entity {primaryKey} does not exist in {path} collection")
+
+    if delete_file:
+        result = {}
+        for attribute in attributeNames:
+            value = primary_key.get(attribute, None)
+            if attribute in sensitiveAttributes:
+                value = encrypt(value)
+            result[attribute] = value
+        result["id"] = entry.id
+        result["_deleted"] = deleted
+        delete_file(
+            f"{path}/{entry.id}/data.json",
+            json.dumps(result),
+            f"Deleted {entry.id} in {path} collection",
+        )
+        result["_type"] = "org.acmsl.licdata.events.client.ClientDeleted"
+        create_file(
+            f"{path}/{entry.id}/_events/{timestamp}-client_deleted.json",
+            json.dumps(result),
+            f"Created a new entry {timestamp}-_client_deleted.json in {path}/{entry.id}/_events/ collection",
+        )
+
+    return result
+
+
+def old():
     try:
         (data, _) = get_contents(f"{path}/data.json")
     except:
@@ -383,6 +510,11 @@ def delete(id: str, path: str):
         )
 
         delete_file(f"{path}/{id}/data.json", f"Deleted {path}/{id}/data.json")
+        create_file(
+            f"{path}/{result}/_events/{timestamp}-client_deleted.json",
+            json.dumps(item),
+            f"Created a new entry {timestamp}-client_deleted.json in {path}/{result}/_events/ collection",
+        )
         result = True
 
     return result
