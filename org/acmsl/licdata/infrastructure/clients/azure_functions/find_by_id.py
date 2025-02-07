@@ -38,25 +38,43 @@ async def find_client_by_id(
     :return: The response.
     :rtype: azure.functions.HttpResponse
     """
-    from pythoneda.shared import Ports
-    from org.acmsl.licdata import ClientRepo
-    import org.acmsl.licdata.infrastructure.clients.common as common
-    import org.acmsl.licdata.infrastructure.rest as rest
+    from pythoneda.shared.infrastructure.azure.functions import get_pythoneda_app
+    from pythoneda.shared.infrastructure.http import HttpMethod
+    from org.acmsl.licdata.events.clients import (
+        FindClientByIdRequested,
+    )
+    from org.acmsl.licdata.events.infrastructure.http.clients import (
+        HttpClientResponseFactory,
+        HttpFindClientByIdRequested,
+    )
 
-    client_repo = Ports.instance().resolve_first(ClientRepo)
-    ClientRepo.logger().info("Finding a client by its id.")
+    event = HttpFindClientByIdRequested(
+        httpMethod=HttpMethod.GET,
+        queryStringParameters=req.params,
+        headers=req.headers,
+        pathParameters=req.route_params,
+        body={},
+    ).to_event()
 
-    event = {
-        "httpMethod": "GET",
-        "queryStringParameters": req.params,
-        "pathParameters": req.route_params,
-        "headers": req.headers,
-        "body": {},
-    }
+    app = get_pythoneda_app()
 
-    resp = rest.find_by_id(event, context, client_repo)
+    resulting_event = None
+    resulting_events = await app.accept(event)
 
-    return func.HttpResponse(resp["body"], status_code=resp["statusCode"])
+    if len(resulting_events) > 0:
+        resulting_event = resulting_events[0]
+
+    outcome = HttpClientResponseFactory.instance().from_find_client_by_id_requested(
+        resulting_event, event
+    )
+
+    return func.HttpResponse(
+        outcome.body,
+        status_code=outcome.status_code,
+        mimetype=outcome.mime_type,
+        headers=outcome.headers,
+        charset=outcome.charset,
+    )
 
 
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et

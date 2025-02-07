@@ -20,7 +20,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 from org.acmsl.licdata import Client, ClientRepo
-from org.acmsl.licdata.events.clients import NewClientCreated, NewClientRequested
+from org.acmsl.licdata.events.clients import (
+    DeleteClientRequested,
+    ClientDeleted,
+    InvalidDeleteClientRequest,
+    NewClientCreated,
+    NewClientRequested,
+)
 from org.acmsl.licdata.infrastructure.github import GithubRepo
 
 from typing import Dict, List, Optional, Tuple
@@ -63,7 +69,17 @@ class GithubClientRepo(ClientRepo):
         :return: The client.
         :rtype: Client from domain.client
         """
-        return self._github_repo.find_by_id(id)
+        return self._github_repo.find_by_id(id, buildEntity=self.build_entity_from_dict)
+
+    def build_entity_from_dict(self, dict: Dict) -> Client:
+        """
+        Builds a Client from a dictionary.
+        :param dict: The dictionary.
+        :type dict: Dict
+        :return: The Client instance.
+        :rtype: org.acmsl.licdata.Client
+        """
+        return Client.from_dict(dict)
 
     def find_by_attribute(self, attributeName: str, attributeValue: str):
         """
@@ -105,23 +121,8 @@ class GithubClientRepo(ClientRepo):
         :return: The new client and the event.
         :rtype: Tuple[org.acmsl.licdata.Client, org.acmsl.licdata.events.clients.NewClientCreated]
         """
-        new_client = Client(
-            email=newClientRequested.email,
-            address=newClientRequested.address,
-            contact=newClientRequested.contact,
-            phone=newClientRequested.phone,
-        )
-        new_client_created = NewClientCreated(
-            id=new_client.id,
-            email=newClientRequested.email,
-            address=newClientRequested.address,
-            contact=newClientRequested.contact,
-            phone=newClientRequested.phone,
-            previousEventIds=(
-                newClientRequested.previous_event_ids + [newClientRequested.id]
-            ),
-        )
-        return (new_client, new_client_created)
+        new_client = Client.create_from(newClientRequested)
+        return (new_client, new_client.created_event)
 
     def update(self, item):
         """
@@ -131,15 +132,52 @@ class GithubClientRepo(ClientRepo):
         """
         return self._github_repo.update(item)
 
-    def delete(self, id: str):
+    def delete(
+        self,
+        deleteClientRequested: DeleteClientRequested,
+    ) -> ClientDeleted:
         """
         Deletes a Client.
-        :param id: The id of the client.
-        :type id: str
-        :return: True if the client is removed.
-        :rtype: bool
+        :param deleteClientRequested: The event requesting the removal of the client.
+        :type deleteClientRequested: org.acmsl.licdata.events.clients.DeleteClientRequested
+        :return: The entity-deleted event if the client gets removed.
+        :rtype: org.acmsl.licdata.events.clients.ClientDeleted
         """
-        return self._github_repo.delete(id)
+        return self._github_repo.delete(
+            deleteEntityRequested=deleteClientRequested,
+            buildEntity=self.build_entity_from_dict,
+            buildInvalidDeleteEntityRequestEvent=self.build_invalid_delete_entity_request_event,
+        )
+
+    def _create_client_deleted_event(
+        self, deleteClientRequested: DeleteClientRequested
+    ) -> ClientDeleted:
+        """
+        Creates a new ClientDeleted event.
+        :param deleteClientRequested: The event requesting the removal of the client.
+        :type deleteClientRequested: org.acmsl.licdata.events.clients.DeleteClientRequested
+        :param clientData: The client data.
+        :type clientData
+        :return: The event.
+        :rtype: org.acmsl.licdata.events.clients.ClientDeleted
+        """
+        client = self.find_by_id(deleteClientRequested)
+        return client.delete()
+
+    def build_invalid_delete_entity_request_event(
+        self, deleteClientRequested: DeleteClientRequested
+    ) -> InvalidDeleteClientRequest:
+        """
+        Builds an InvalidDeleteClientRequest event.
+        :param deleteClientRequested: The event requesting the removal of the client.
+        :type deleteClientRequested: org.acmsl.licdata.events.clients.DeleteClientRequested
+        :return: The event.
+        :rtype: org.acmsl.licdata.events.clients.InvalidDeleteClientRequest
+        """
+        return InvalidDeleteClientRequest(
+            deleteClientRequested.entity_id,
+            deleteClientRequested.previous_event_ids + [deleteClientRequested.id],
+        )
 
     def find_by_pk(self, pk: Dict) -> Optional[Client]:
         """

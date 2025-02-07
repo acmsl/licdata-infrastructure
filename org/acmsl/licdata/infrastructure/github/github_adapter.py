@@ -1,7 +1,7 @@
 """
 org/acmsl/licdata/infrastructure/github/github_adapter.py
 
-This file provides some functions to use github as domain repository.
+This file defines the GithubAdapter class.
 
 Copyright (C) 2023-today ACM S.L. Licdata
 
@@ -23,513 +23,588 @@ from datetime import datetime
 from .github_raw import get_contents, create_file, update_file, delete_file
 import json
 from org.acmsl.licdata.infrastructure.crypt_utils import encrypt
-from pythoneda.shared import camel_to_snake, Entity, Event
+from pythoneda.shared import BaseObject, camel_to_snake, Entity, Event
 from uuid import uuid4
 from typing import Callable, Dict, List, Tuple
 
 
-def new_id() -> str:
+class GithubAdapter(BaseObject):
     """
-    Creates a new id.
-    :return: The id.
-    :rtype: str
+    Github adapter.
+
+    Class name: GithubAdapter
+
+    Responsibilities:
+        - Define functions to interact with Github repositories via HTTP endpoints.
+
+    Collaborators:
+        - None
     """
-    return str(uuid4())
 
+    _singleton = None
 
-def find_by_id(id: str, path: str):
-    """
-    Finds an item matching given id (using the path structure in github).
-    :param id: The id.
-    :type id: str
-    :param path: The relative path.
-    :type path: str
-    :return: The tuple (item, sha)
-    :rtype: tuple
-    """
-    result = None
+    def __init__(self):
+        """
+        Creates a new GithubAdapter instance.
+        """
+        super().__init__()
 
-    data = None
+    @classmethod
+    def instance(cls) -> "GithubAdapter":
+        """
+        Retrieves the instance.
+        :return: Such instance.
+        :rtype: org.acmsl.licdata.infrastructure.github.GithubAdapter
+        """
+        if cls._singleton is None:
+            cls._singleton = cls()
+        return cls._singleton
 
-    try:
-        (data, _) = get_contents(f"{path}/{id}/data.json")
-    except:
+    def new_id(self) -> str:
+        """
+        Creates a new id.
+        :return: The id.
+        :rtype: str
+        """
+        return str(uuid4())
+
+    def find_by_id(
+        self, id: str, path: str, buildEntity: Callable[[Dict], Entity]
+    ) -> Tuple[Dict, str]:
+        """
+        Finds an item matching given id (using the path structure in github).
+        :param id: The id.
+        :type id: str
+        :param path: The relative path.
+        :type path: str
+        :param buildEntity: A function to build the entity.
+        :type buildEntity: callable[[Dict], pythoneda.shared.Entity]
+        :return: The tuple (item, sha)
+        :rtype: Tuple[Dict, str]
+        """
+        result = None
+
         data = None
+        sha = None
 
-    if data:
-        result = json.loads(data)
+        try:
+            (data, sha) = get_contents(f"{path}/{id}/data.json")
+        except Exception as err:
+            GithubAdapter.logger().error(err)
+            data = None
 
-    return result
+        if data:
+            result = buildEntity(json.loads(data))
 
+        return (result, sha)
 
-def find_all_by_attributes(filter: Dict, path: str):
-    """
-    Retrieves all items matching given attribute values.
-    :param filter: The attribute filter.
-    :type filter: Dict
-    :param path: The relative path.
-    :type path: str
-    :return: A tuple of the items and the checksum.
-    :rtype: tuple
-    """
-    result = []
+    def find_all_by_attributes(self, filter: Dict, path: str) -> Tuple[List[Dict], str]:
+        """
+        Retrieves all items matching given attribute values.
+        :param filter: The attribute filter.
+        :type filter: Dict
+        :param path: The relative path.
+        :type path: str
+        :return: A tuple of the items and the checksum.
+        :rtype: Tuple[List[Dict], str]
+        """
+        result = []
+        sha = None
 
-    try:
-        (all_items, _) = get_contents(f"{path}/data.json")
-    except:
-        all_items = None
-    if all_items:
-        all_items_content = json.loads(all_items)
-        item = {}
-        for key in filter:
-            item[key] = filter[key]
-        result = [
-            x for x in all_items_content if _attributes_match(x, item, filter.keys())
-        ]
+        try:
+            (all_items, sha) = get_contents(f"{path}/data.json")
+        except Exception as err:
+            GithubAdapter.logger().error(err)
+            all_items = None
+        if all_items is not None:
+            all_items_content = json.loads(all_items)
+            item = {}
+            for key in filter:
+                item[key] = filter[key]
+            result = [
+                x
+                for x in all_items_content
+                if self._attributes_match(x, item, filter.keys())
+            ]
 
-    return result
+        return (result, sha)
 
+    def find_all_by_attribute(
+        self, attributeValue: str, attributeName: str, path: str
+    ) -> Tuple[List[Dict], str]:
+        """
+        Finds all items matching one attribute filter.
+        :param attributeValue: The attribute value.
+        :type attributeValue: str
+        :param attributeName: The attribute name.
+        :type attributeName: str
+        :param path: The relative path.
+        :type path: str
+        :return: The tuple of matching items and the checksum.
+        :rtype: Tuple[List[Dict], str]
+        """
+        filter = {}
+        filter[attributeName] = attributeValue
+        return self.find_all_by_attributes(filter, path)
 
-def find_all_by_attribute(attributeValue: str, attributeName: str, path: str):
-    """
-    Finds all items matching one attribute filter.
-    :param attributeValue: The attribute value.
-    :type attributeValue: str
-    :param attributeName: The attribute name.
-    :type attributeName: str
-    :param path: The relative path.
-    :type path: str
-    :return: The tuple of matching items and the checksum.
-    :rtype: tuple
-    """
-    filter = {}
-    filter[attributeName] = attributeValue
-    return find_all_by_attributes(filter, path)
+    def find_by_attribute(
+        self, attributeValue: str, attributeName: str, path
+    ) -> Tuple[Dict, str]:
+        """
+        Finds an item matching one attribute filter.
+        :param attributeValue: The attribute value.
+        :type attributeValue: str
+        :param attributeName: The attribute name.
+        :type attributeName: str
+        :param path: The relative path.
+        :type path: str
+        :return: The tuple of matching item and the checksum.
+        :rtype: Tuple[Dict, str]
+        """
+        result = None
 
+        (matches, sha) = self.find_all_by_attribute(attributeValue, attributeName, path)
 
-def find_by_attribute(attributeValue: str, attributeName: str, path):
-    """
-    Finds an item matching one attribute filter.
-    :param attributeValue: The attribute value.
-    :type attributeValue: str
-    :param attributeName: The attribute name.
-    :type attributeName: str
-    :param path: The relative path.
-    :type path: str
-    :return: The tuple of matching item and the checksum.
-    :rtype: tuple
-    """
-    result = None
+        if matches:
+            result = matches[0]
+        else:
+            GithubAdapter.logger().debug(
+                f"No {path} with {attributeName} {attributeValue}"
+            )
 
-    matches = find_all_by_attribute(attributeValue, attributeName, path)
+        return (result, sha)
 
-    if matches:
-        result = matches[0]
-    else:
-        print(f"No {path} with {attributeName} {attributeValue}")
+    def find_by_attributes(self, filter: Dict, path: str) -> Tuple[List[Dict], str]:
+        """
+        Finds an item matching given attribute filter.
+        :param filter: The attribute filter.
+        :type filter: Dict
+        :param path: The relative path.
+        :type path: str
+        :return: The tuple of matching item and the checksum.
+        :rtype: Tuple[List[Dict], str]
+        """
+        result = None
 
-    return result
+        (matches, sha) = self.find_all_by_attributes(filter, path)
 
+        if matches:
+            result = matches[0]
+        else:
+            GithubAdapter.logger().debug(f"No {path} found matching {filter}")
 
-def find_by_attributes(filter: Dict, path: str) -> List:
-    """
-    Finds an item matching given attribute filter.
-    :param filter: The attribute filter.
-    :type filter: Dict
-    :param path: The relative path.
-    :type path: str
-    :return: The tuple of matching item and the checksum.
-    :rtype: tuple
-    """
-    result = None
+        return (result, sha)
 
-    matches = find_all_by_attributes(filter, path)
+    def insert(
+        self,
+        newEntityRequested: Event,
+        buildNewEntity: Callable[[Event], Tuple[Entity, Event]],
+        path: str,
+        primaryKey: List,
+        filterKeys: List,
+        attributeNames: List,
+        sensitiveAttributes: List,
+    ) -> Event:
+        """
+        Inserts a new entity.
+        :param newEntityRequested: The event requesting the new entity.
+        :type newEntityRequested: pythoneda.shared.Event
+        :param buildNewEntity: A function to create the new-entity-created e.
+        :type buildNewEntity: callable[[pythoneda.shared.Event], Tuple[pythoneda.shared.Entity, pythoneda.shared.Event]]
+        :param path: The relative path.
+        :type path: str
+        :param primaryKey: The entity's primary key.
+        :type primaryKey: List
+        :param filterKeys: The entity's filter keys.
+        :type filterKeys: List
+        :param attributeNames: The entity's attribute names.
+        :type attributeNames: List
+        :param sensitiveAttributes: The names of the attributes that need to be encrypted.
+        :type sensitiveAttributes: List
+        :return: The event representing the new entity has been created.
+        :rtype: pythoneda.shared.Event
+        """
+        entity, result = buildNewEntity(newEntityRequested)
 
-    if matches:
-        result = matches[0]
-    else:
-        print(f"No {path} found matching {filter}")
-
-    return result
-
-
-def insert(
-    newEntityRequested: Event,
-    buildNewEntity: Callable[[Event], Tuple[Entity, Event]],
-    path: str,
-    primaryKey: List,
-    filterKeys: List,
-    attributeNames: List,
-    sensitiveAttributes: List,
-) -> str:
-    """
-    Inserts a new entity.
-    :param newEntityRequested: The event requesting the new entity.
-    :type newEntityRequested: pythoneda.shared.Event
-    :param buildNewEntity: A function to create the new-entity-created e.
-    :type buildNewEntity: callable[[pythoneda.shared.Event], Tuple[pythoneda.shared.Entity, pythoneda.shared.Event]]
-    :param path: The relative path.
-    :type path: str
-    :param primaryKey: The entity's primary key.
-    :type primaryKey: List
-    :param filterKeys: The entity's filter keys.
-    :type filterKeys: List
-    :param attributeNames: The entity's attribute names.
-    :type attributeNames: List
-    :param sensitiveAttributes: The names of the attributes that need to be encrypted.
-    :type sensitiveAttributes: List
-    :return: The id of the persisted entity.
-    :rtype: str
-    """
-    entity, result = buildNewEntity(newEntityRequested)
-
-    data = None
-    insert_new_file = False
-
-    try:
-        (data, sha) = get_contents(f"{path}/data.json")
-    except:
         data = None
-    if data is None:
-        content = []
-        content.append(entity.to_dict_simplified())
-        create_file(
-            f"{path}/data.json",
-            json.dumps(content),
-            f"First instance in {path} collection: {entity.id}",
-        )
-        insert_new_file = True
-    else:
-        content = json.loads(data)
-        entries = [
-            x for x in content if _attributes_match(x, entity.to_dict(), primaryKey)
-        ]
-        if len(entries) == 0:
+        sha = None
+        insert_new_file = False
+
+        try:
+            (data, sha) = get_contents(f"{path}/data.json")
+        except Exception as err:
+            GithubAdapter.logger().error(err)
+            data = None
+        if data is None:
+            content = []
             content.append(entity.to_dict_simplified())
-            update_file(
+            create_file(
                 f"{path}/data.json",
                 json.dumps(content),
-                f"Updated {entity.id} in {path} collection",
-                sha,
+                result.to_json(),
             )
             insert_new_file = True
         else:
-            print(f"Entity {entity} already exists in {path} collection")
-            insert_new_file = False
+            content = json.loads(data)
+            entries = [
+                x
+                for x in content
+                if self._attributes_match(x, entity.to_dict(), primaryKey)
+            ]
+            if len(entries) == 0:
+                content.append(entity.to_dict_simplified())
+                update_file(
+                    f"{path}/data.json",
+                    json.dumps(content),
+                    result.to_json(),
+                    sha,
+                )
+                insert_new_file = True
+            else:
+                GithubAdapter.logger().info(
+                    f"Not creating a new entity under {path} since another copy already exists"
+                )
+                insert_new_file = False
 
-    if insert_new_file:
-        create_file(
-            f"{path}/{entity.id}/data.json",
-            entity.to_json(),
-            f"Created a new entry {entity.id} in {path} collection",
-        )
-        entity_name = camel_to_snake(entity.__class__.__name__)
-        timestamp = datetime.now().timestamp()
-        create_file(
-            f"{path}/{entity.id}/_events/{timestamp}-new_{entity_name}_requested.json",
-            newEntityRequested.to_json(),
-            f"Created a new entry {timestamp}-new_{entity_name}_requested.json in {path}/{entity.id}/_events/ collection",
-        )
-        timestamp = datetime.now().timestamp()
-        create_file(
-            f"{path}/{entity.id}/_events/{timestamp}-new_{entity_name}_created.json",
-            result.to_json(),
-            f"Created a new entry {timestamp}-new_{entity_name}_created.json in {path}/{entity.id}/_events/ collection",
-        )
-
-    return result
-
-
-def get_property_name(property) -> str:
-    """
-    Retrieves the name of the property.
-    :param property: The property.
-    :type property: property
-    :return: The name of the property.
-    :rtype: str
-    """
-    if isinstance(property, str):
-        return property
-    else:
-        return property.fget.__name__
-
-
-def _attributes_match(item: Dict, target: Dict, attributeNames: List[str]):
-    """
-    Checks if two entities share the same attributes.
-    :param item: The first entity.
-    :type item: Dict
-    :param target: The second entity.
-    :type target: Dict
-    :param attributeNames: The attributes to check.
-    :type attributeNames: List[str]
-    :return: True if they share the same attributes.
-    :rtype: bool
-    """
-    result = True
-
-    for attribute_name in attributeNames:
-        if item.get(attribute_name, None) != target.get(attribute_name, None):
-            result = False
-            break
-
-    return result
-
-
-def update(
-    entity,
-    path: str,
-    primaryKey: List,
-    filterKeys: List,
-    attributeNames: List,
-    sensitiveAttributes: List,
-):
-    """
-    Updates given entity.
-    :param entity: The entity to update.
-    :type entity: ValueObject from pythoneda.value_object
-    :param path: The relative path.
-    :type path: str
-    :param primaryKey: The entity's primary key.
-    :type primaryKey: List
-    :param filterKeys: The entity's filter keys.
-    :type filterKeys: List
-    :param attributeNames: The entity's attribute names.
-    :type attributeNames: List
-    :param sensitiveAttributes: The names of the attributes that need to be encrypted.
-    :type sensitiveAttributes: List
-    """
-    id = entity.get("id")
-    item = {}
-    item["id"] = id
-    for attribute in primaryKey + filterKeys:
-        value = entity.get(attribute)
-        if attribute in sensitiveAttributes:
-            value = encrypt(value)
-        item[attribute] = value
-    try:
-        (data, sha) = get_contents(f"{path}/data.json")
-    except:
-        data = None
-    if data:
-        content = json.loads(data)
-        existing = [x for x in content if x.get("id") == id]
-        if existing and not _attributes_match(existing[0], entity, attributeNames):
-            remaining = [x for x in content if x.get("id") != id]
-            remaining.append(item)
-            update_file(
-                f"{path}/data.json",
-                json.dumps(remaining),
-                f"Updated {id} in {path}/data.json",
-                sha,
+        if insert_new_file:
+            create_file(
+                f"{path}/{entity.id}/data.json", entity.to_json(), result.to_json()
             )
-    try:
-        (old_item, oldSha) = get_contents(f"{path}/{id}/data.json")
-    except:
-        old_item = None
-    if old_item:
-        for attribute in attributeNames:
+            entity_name = camel_to_snake(entity.__class__.__name__)
+            timestamp = datetime.now().timestamp()
+            create_file(
+                f"{path}/{entity.id}/_events/{timestamp}-new_{entity_name}_requested.json",
+                newEntityRequested.to_json(),
+                newEntityRequested.to_json(),
+            )
+            timestamp = datetime.now().timestamp()
+            create_file(
+                f"{path}/{entity.id}/_events/{timestamp}-new_{entity_name}_created.json",
+                result.to_json(),
+                result.to_json(),
+            )
+
+        return result
+
+    def get_property_name(self, prop) -> str:
+        """
+        Retrieves the name of the property.
+        :param prop: The property.
+        :type prop: property
+        :return: The name of the property.
+        :rtype: str
+        """
+        if isinstance(prop, str):
+            return prop
+        else:
+            return prop.fget.__name__
+
+    def _attributes_match(self, item: Dict, target: Dict, attributeNames: List[str]):
+        """
+        Checks if two entities share the same attributes.
+        :param item: The first entity.
+        :type item: Dict
+        :param target: The second entity.
+        :type target: Dict
+        :param attributeNames: The attributes to check.
+        :type attributeNames: List[str]
+        :return: True if they share the same attributes.
+        :rtype: bool
+        """
+        result = True
+
+        for attribute_name in attributeNames:
+            if item.get(attribute_name, None) != target.get(attribute_name, None):
+                result = False
+                break
+
+        return result
+
+    def delete(
+        self,
+        deleteEntityRequested: Event,
+        buildEntity: Callable[[Dict], Entity],
+        buildInvalidDeleteEntityRequestEvent: Callable[[Event], Event],
+        path: str,
+        attributeNames: List,
+        sensitiveAttributes: List,
+    ) -> Dict:
+        """
+        Deletes an item in the repository.
+        :param deleteEntityRequested: The event requesting the removal of an entity.
+        :type deleteEntityRequested: pythoneda.shared.Event
+        :param buildEntity: A function to build the entity.
+        :type buildEntity: callable[[Dict], pythoneda.shared.Entity]
+        :param buildInvalidDeleteEntityRequestEvent: A function to build the invalid-delete-entity-request event.
+        :type buildInvalidDeleteEntityRequestEvent: Callable[[pythoneda.shared.Event], pythoneda.shared.Event]
+        :param path: The relative path.
+        :type path: str
+        :param attributeNames: The entity's attribute names.
+        :type attributeNames: List
+        :param sensitiveAttributes: The names of the attributes that need to be encrypted.
+        :type sensitiveAttributes: List
+        :return: The event representing the new entity has been deleted.
+        :rtype: pythoneda.shared.Event
+        """
+        result = None
+        now = datetime.now()
+        deleted = now.strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = now.timestamp()
+        data = None
+        update_summary = False
+
+        try:
+            entity = None
+            sha = None
+            if deleteEntityRequested.entity_id is not None:
+                (entity, sha) = self.find_by_id(
+                    deleteEntityRequested.entity_id, path, buildEntity
+                )
+            elif deleteEntityRequested.entity_primary_key is not None:
+                (entity, sha) = self.find_by_pk(
+                    deleteEntityRequested.entity_primary_key, path, buildEntity
+                )
+
+            if entity is None:
+                result = buildInvalidDeleteEntityRequestEvent(deleteEntityRequested)
+            else:
+                entity_name = camel_to_snake(entity.__class__.__name__)
+                result = entity.delete(deleteEntityRequested)
+                if result is not None:
+                    update_file(
+                        f"{path}/{deleteEntityRequested.entity_id}/data.json",
+                        entity.to_json(),
+                        result.to_json(),
+                        sha,
+                    )
+                    create_file(
+                        f"{path}/{deleteEntityRequested.entity_id}/_events/{timestamp}-{entity_name}_deleted.json",
+                        result.to_json(),
+                        result.to_json(),
+                    )
+                    create_file(
+                        f"{path}/{deleteEntityRequested.entity_id}.deleted",
+                        "",
+                        result.to_json(),
+                    )
+                    update_summary = True
+        except Exception as err:
+            GithubAdapter.logger().error(err)
+            update_summary = False
+
+        if update_summary:
+            try:
+                (data, sha) = get_contents(f"{path}/data.json")
+            except Exception as err:
+                GithubAdapter.logger().error(err)
+                data = None
+
+            if data is not None:
+                content = json.loads(data)
+                summary = any(
+                    [
+                        x
+                        for x in content
+                        if x.get("id", None) == deleteEntityRequested.entity_id
+                    ]
+                )
+                if summary:
+                    update_file(
+                        f"{path}/data.json",
+                        json.dumps(
+                            [
+                                x
+                                for x in content
+                                if x.get("id", None) != deleteEntityRequested.entity_id
+                            ]
+                        ),
+                        result.to_json(),
+                        sha,
+                    )
+                else:
+                    GithubAdapter.logger().error(
+                        f"{path}/data.json does not contain {deleteEntityRequested.entity_id}"
+                    )
+
+        return result
+
+    def update(
+        self,
+        entity,
+        path: str,
+        primaryKey: List,
+        filterKeys: List,
+        attributeNames: List,
+        sensitiveAttributes: List,
+    ) -> Tuple[Dict, str]:
+        """
+        Updates given entity.
+        :param entity: The entity to update.
+        :type entity: ValueObject from pythoneda.value_object
+        :param path: The relative path.
+        :type path: str
+        :param primaryKey: The entity's primary key.
+        :type primaryKey: List
+        :param filterKeys: The entity's filter keys.
+        :type filterKeys: List
+        :param attributeNames: The entity's attribute names.
+        :type attributeNames: List
+        :param sensitiveAttributes: The names of the attributes that need to be encrypted.
+        :type sensitiveAttributes: List
+        :return: The updated entity and the new sha.
+        :rtype: Tuple[Dict, str]
+        """
+        id = entity.get("id")
+        item = {}
+        item["id"] = id
+        for attribute in primaryKey + filterKeys:
             value = entity.get(attribute)
             if attribute in sensitiveAttributes:
                 value = encrypt(value)
-            item[attribute] = value
-        item["id"] = id
-        item["_created"] = entity.get("_created")
-        item["_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        update_file(
-            f"{path}/{id}/data.json",
-            json.dumps(item),
-            f"Updated {path}/{id}/data.json",
-            oldSha,
-        )
-    else:
-        print(f"{path}/{id}/data.json not found")
+                item[attribute] = value
+        try:
+            (data, sha) = get_contents(f"{path}/data.json")
+        except Exception as err:
+            GithubAdapter.logger().error(err)
+            data = None
 
-    return item
+        if data is not None:
+            content = json.loads(data)
+            existing = [x for x in content if x.get("id") == id]
+            if existing and not self._attributes_match(
+                existing[0], entity, attributeNames
+            ):
+                remaining = [x for x in content if x.get("id") != id]
+                remaining.append(item)
+                update_file(
+                    f"{path}/data.json",
+                    json.dumps(remaining),
+                    f"Updated {id} in {path}/data.json",
+                    sha,
+                )
+        try:
+            (old_item, oldSha) = get_contents(f"{path}/{id}/data.json")
+        except Exception as err:
+            GithubAdapter.logger().error(err)
+            old_item = None
 
-
-def delete(
-    id: str,
-    path: str,
-    attributeNames: List,
-    sensitiveAttributes: List,
-) -> Dict:
-    """
-    Deletes an item in the repository.
-    :param id: The id of the item to delete.
-    :type id: List
-    :param path: The relative path.
-    :type path: str
-    :param attributeNames: The entity's attribute names.
-    :type attributeNames: List
-    :param sensitiveAttributes: The names of the attributes that need to be encrypted.
-    :type sensitiveAttributes: List
-    :return: The information about the removed item.
-    :rtype: Dict
-    """
-    result = {}
-    now = datetime.now()
-    deleted = now.strftime("%Y-%m-%d %H:%M:%S")
-    timestamp = now.timestamp()
-    data = None
-    delete_file = False
-
-    try:
-        (data, sha) = get_contents(f"{path}/data.json")
-    except:
-        data = None
-    if data is not None:
-        content = json.loads(data)
-        result = any([x for x in content if x.get("id", None) == id])
-        if entry is not None:
-            update_file(
-                f"{path}/data.json",
-                json.dumps([x for x in content if x != result]),
-                f"Deleted {id} in {path} collection",
-                sha,
+        if old_item is not None:
+            for attribute in attributeNames:
+                value = entity.get(attribute)
+                if attribute in sensitiveAttributes:
+                    value = encrypt(value)
+                item[attribute] = value
+            item["id"] = id
+            item["_created"] = entity.get("_created")
+            item["_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            newSha = update_file(
+                f"{path}/{id}/data.json",
+                json.dumps(item),
+                f"Updated {path}/{id}/data.json",
+                oldSha,
             )
-            delete_file = True
         else:
-            print(f"Entity {id} does not exist in {path} collection")
+            GithubAdapter.logger().info(f"{path}/{id}/data.json not found")
 
-    if delete_file:
-        (data, sha) = get_contents(f"{path}/{id}/data.json")
-        json_data = json.loads(data)
-        result = json_data.copy()
-        result["_deleted"] = deleted
-        delete_file(f"{path}/{id}/data.json", f"Deleted {path}/{id}/data.json", sha)
-        result["_type"] = "org.acmsl.licdata.events.client.ClientDeleted"
-        create_file(
-            f"{path}/{entry.id}/_events/{timestamp}-client_deleted.json",
-            json.dumps(result),
-            f"Created a new entry {timestamp}-_client_deleted.json in {path}/{id}/_events/ collection",
-        )
-        result = json_data
-        for attribute in sensitiveAttributes:
-            value = entity.get(attribute)
-            result[attribute] = encrypt(result.get(attribute))
+        return (item, newSha)
 
-    return result
-
-
-def delete_by_pk(
-    primaryKey: List,
-    path: str,
-    primaryKeyNames: List,
-    attributeNames: List,
-    sensitiveAttributes: List,
-) -> Dict:
-    """
-    Deletes an item in the repository.
-    :param primaryKey: The primary key of the item to delete.
-    :type primaryKey: List
-    :param path: The relative path.
-    :type path: str
-    :param primaryKeyNames: The entity's primary key.
-    :type primaryKeyNames: List
-    :param attributeNames: The entity's attribute names.
-    :type attributeNames: List
-    :param sensitiveAttributes: The names of the attributes that need to be encrypted.
-    :type sensitiveAttributes: List
-    :return: The information about the removed item.
-    :rtype: Dict
-    """
-    result = {}
-    now = datetime.now()
-    deleted = now.strftime("%Y-%m-%d %H:%M:%S")
-    timestamp = now.timestamp()
-    data = None
-    delete_file = False
-    entry = {}
-    primary_key = primaryKey.to_dict()
-    for attribute in primaryKeyNames:
-        value = primary_key.get(attribute, None)
-        if attribute in sensitiveAttributes:
-            value = encrypt(value)
-        result[attribute] = value
-    result["id"] = result
-
-    try:
-        (data, sha) = get_contents(f"{path}/data.json")
-    except:
-        data = None
-    if data is not None:
-        content = json.loads(data)
-        entries = [
-            x for x in content if _attributes_match(x, primary_key, primaryKeyNames)
-        ]
-        if len(entries) > 0:
-            entry = entries[0]
-            update_file(
-                f"{path}/data.json",
-                json.dumps([x for x in entries if x != entry]),
-                f"Deleted {result} in {path} collection",
-                sha,
-            )
-            delete_file = True
-        else:
-            print(f"Entity {primaryKey} does not exist in {path} collection")
-
-    if delete_file:
+    def delete_by_pk(
+        self,
+        primaryKey: List,
+        path: str,
+        primaryKeyNames: List,
+        attributeNames: List,
+        sensitiveAttributes: List,
+    ) -> Dict:
+        """
+        Deletes an item in the repository.
+        :param primaryKey: The primary key of the item to delete.
+        :type primaryKey: List
+        :param path: The relative path.
+        :type path: str
+        :param primaryKeyNames: The entity's primary key.
+        :type primaryKeyNames: List
+        :param attributeNames: The entity's attribute names.
+        :type attributeNames: List
+        :param sensitiveAttributes: The names of the attributes that need to be encrypted.
+        :type sensitiveAttributes: List
+        :return: The information about the removed item.
+        :rtype: Dict
+        """
         result = {}
-        for attribute in attributeNames:
+        now = datetime.now()
+        deleted = now.strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = now.timestamp()
+        data = None
+        delete_file = False
+        entry = {}
+        primary_key = primaryKey.to_dict()
+        for attribute in primaryKeyNames:
             value = primary_key.get(attribute, None)
             if attribute in sensitiveAttributes:
                 value = encrypt(value)
             result[attribute] = value
-        result["id"] = entry.id
-        result["_deleted"] = deleted
-        delete_file(
-            f"{path}/{entry.id}/data.json",
-            json.dumps(result),
-            f"Deleted {entry.id} in {path} collection",
-        )
-        result["_type"] = "org.acmsl.licdata.events.client.ClientDeleted"
-        create_file(
-            f"{path}/{entry.id}/_events/{timestamp}-client_deleted.json",
-            json.dumps(result),
-            f"Created a new entry {timestamp}-_client_deleted.json in {path}/{entry.id}/_events/ collection",
-        )
+        result["id"] = result
 
-    return result
+        try:
+            (data, sha) = get_contents(f"{path}/data.json")
+        except Exception as err:
+            GithubAdapter.logger().error(err)
+            data = None
 
+        if data is not None:
+            content = json.loads(data)
+            entries = [
+                x
+                for x in content
+                if self._attributes_match(x, primary_key, primaryKeyNames)
+            ]
+            if len(entries) > 0:
+                entry = entries[0]
+                update_file(
+                    f"{path}/data.json",
+                    json.dumps([x for x in entries if x != entry]),
+                    f"Deleted {result} in {path} collection",
+                    sha,
+                )
+                delete_file = True
+            else:
+                GithubAdapter.logger().info(
+                    f"Entity {primaryKey} does not exist in {path} collection"
+                )
 
-def old():
-    try:
-        (data, _) = get_contents(f"{path}/data.json")
-    except:
-        data = None
-    if data:
-        content = json.loads(data)
-        existing = [x for x in content if x.get("id") != id]
-        update_file(
-            f"{path}/data.json",
-            json.dumps(existing),
-            f"Deleted {id} from {path}/data.json",
-            sha,
-        )
+        if delete_file:
+            result = {}
+            for attribute in attributeNames:
+                value = primary_key.get(attribute, None)
+                if attribute in sensitiveAttributes:
+                    value = encrypt(value)
+                result[attribute] = value
+            result["id"] = entry.id
+            result["_deleted"] = deleted
+            delete_file(
+                f"{path}/{entry.id}/data.json",
+                json.dumps(result),
+                f"Deleted {entry.id} in {path} collection",
+            )
+            create_file(
+                f"{path}/{entry.id}/_events/{timestamp}-deleted.json",
+                json.dumps(result),
+                f"Created a new entry {timestamp}-deleted.json in {path}/{entry.id}/_events/ collection",
+            )
 
-        delete_file(f"{path}/{id}/data.json", f"Deleted {path}/{id}/data.json")
-        create_file(
-            f"{path}/{result}/_events/{timestamp}-client_deleted.json",
-            json.dumps(item),
-            f"Created a new entry {timestamp}-client_deleted.json in {path}/{result}/_events/ collection",
-        )
-        result = True
+        return result
 
-    return result
-
-
-def list(path: str) -> List:
-    """
-    Retrieves all items.
-    :param path: The relative path.
-    :type path: str
-    :return: The list of all items.
-    :rtype: List
-    """
-    (data, _) = get_contents(f"{path}/data.json")
-    return json.loads(data)
+    def list(self, path: str) -> Tuple[List, str]:
+        """
+        Retrieves all items.
+        :param path: The relative path.
+        :type path: str
+        :return: The list of all items.
+        :rtype: List
+        """
+        (data, sha) = get_contents(f"{path}/data.json")
+        return (json.loads(data), sha)
 
 
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et

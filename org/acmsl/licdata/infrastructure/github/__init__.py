@@ -22,18 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 __path__ = __import__("pkgutil").extend_path(__path__, __name__)
 
 from .github_access import get_repo, get_branch, get_repo_and_branch
-from .github_adapter import (
-    new_id,
-    find_by_id,
-    find_all_by_attributes,
-    find_all_by_attribute,
-    find_by_attribute,
-    find_by_attributes,
-    insert,
-    update,
-    delete,
-    list,
-)
+from .github_adapter import GithubAdapter
 from .github_raw import get_contents, create_file, update_file, delete_file
 from .github_repo import GithubRepo
 

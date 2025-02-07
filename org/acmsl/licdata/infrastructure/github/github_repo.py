@@ -20,7 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/users/>.
 """
 
 import inspect
-from org.acmsl.licdata.infrastructure.github import github_adapter
+from .github_adapter import GithubAdapter
 from pythoneda.shared import BaseObject, Entity, Event
 from typing import Callable, Dict, List, Tuple, Type, Optional
 
@@ -35,7 +35,7 @@ class GithubRepo(BaseObject):
         - Provide the common logic for all github-based repositories.
 
     Collaborators:
-        - GithubAdapter from infrastructure.github.github_adapter: To simplify the use of the Github API.
+        - GithubAdapter from infrastructure.github.GithubAdapter.instance(): To simplify the use of the Github API.
 
     """
 
@@ -135,39 +135,44 @@ class GithubRepo(BaseObject):
         """
         return self._sensitive_attributes
 
-    def find_by_id(self, id: str):
+    def find_by_id(self, id: str, buildEntity: Callable[[Dict], Entity]) -> Entity:
         """
         Finds the item matching given id.
         :param id: The id.
         :type id: str
+        :param buildEntity: A function to build the entity.
+        :type buildEntity: callable[[Dict], Entity]
         :return: The specific entity.
-        :rtype: object
+        :rtype: pythoneda.shared.Entity
         """
-        return github_adapter.find_by_id(id, self._path)
+        (result, _) = GithubAdapter.instance().find_by_id(id, self._path, buildEntity)
+        return result
 
-    def find_by_attribute(self, attributeName: str, attributeValue: str):
+    def find_by_attribute(self, attributeName: str, attributeValue: str) -> Entity:
         """
         Finds items matching a given attribute.
         :param attributeName: The name of the attribute.
         :type attributeName: str
         :param attributeValue: The name of the attribute.
         :type attributeValue: str
-        :return: A tuple with the matching items and the hash.
-        :rtype: tuple
+        :return: The entity.
+        :rtype: pythoneda.shared.Entity
         """
-        return github_adapter.find_by_attribute(
+        (result, _) = GithubAdapter.instance().find_by_attribute(
             attributeValue, attributeName, self._path
         )
+        return result
 
-    def find_by_attributes(self, filter: Dict):
+    def find_by_attributes(self, filter: Dict) -> List[Entity]:
         """
         Finds items matching given attribute filter.
         :param filter: A dictionary of attribute names and values used to filter.
         :type filte: Dict
-        :return: A tuple with the matching items and the hash.
-        :rtype: tuple
+        :return: The entities.
+        :rtype: List[pythoneda.shared.Entity]
         """
-        return github_adapter.find_by_attributes(filter, self._path)
+        (result, _) = GithubAdapter.instance().find_by_attributes(filter, self._path)
+        return result
 
     def insert(
         self,
@@ -183,7 +188,7 @@ class GithubRepo(BaseObject):
         :return: The new-entity-created event if the entity gets persisted.
         :rtype: pythoneda.shared.Event
         """
-        return github_adapter.insert(
+        return GithubAdapter.instance().insert(
             newEntityRequested=newEntityRequested,
             buildNewEntity=buildNewEntity,
             path=self._path,
@@ -201,7 +206,7 @@ class GithubRepo(BaseObject):
         :return: True if the item gets updated.
         :rtype: bool
         """
-        return github_adapter.update(
+        (result, _) = GithubAdapter.instance().update(
             item,
             self._path,
             self._primary_key,
@@ -209,20 +214,30 @@ class GithubRepo(BaseObject):
             self._attributes,
             self._sensitive_attributes,
         )
+        return result
 
-    def delete(self, id: str) -> object:
+    def delete(
+        self,
+        deleteEntityRequested: Event,
+        buildEntity: Callable[[Dict], Entity],
+        buildInvalidDeleteEntityRequestEvent: Callable[[Event], Event],
+    ) -> Event:
         """
         Deletes an item.
-        :param id: The id of the item to delete.
-        :type id: str
-        :return: The deleted item, if the operation succeeds.
-        :rtype: object
+        :param deleteClientRequested: The event requesting the removal of the client.
+        :type deleteClientRequested: org.acmsl.licdata.events.clients.DeleteClientRequested
+        :param buildInvalidDeleteEntityRequestEvent: A function to build the invalid-delete-entity-request event.
+        :type buildInvalidDeleteEntityRequestEvent: Callable[[pythoneda.shared.Event], pythoneda.shared.Event]
+        :return: The entity-deleted event if the entity gets removed.
+        :rtype: pythoneda.shared.Event
         """
-        return github_adapter.delete(
-            id,
-            self._path,
-            self._attributes,
-            self._sensitive_attributes,
+        return GithubAdapter.instance().delete(
+            deleteEntityRequested=deleteEntityRequested,
+            buildEntity=buildEntity,
+            buildInvalidDeleteEntityRequestEvent=buildInvalidDeleteEntityRequestEvent,
+            path=self._path,
+            attributeNames=self._attributes,
+            sensitiveAttributes=self._sensitive_attributes,
         )
 
     def delete_by_pk(self, primaryKey: List) -> object:
@@ -233,7 +248,7 @@ class GithubRepo(BaseObject):
         :return: The deleted item, if the operation succeeds.
         :rtype: object
         """
-        return github_adapter.delete(
+        return GithubAdapter.instance().delete(
             primaryKey,
             self._path,
             self._primary_key,
@@ -249,7 +264,8 @@ class GithubRepo(BaseObject):
         :return: The item.
         :rtype: Optional[object]
         """
-        return github_adapter.find_by_attributes(pk, self._path)
+        (result, _) = GithubAdapter.instance().find_by_attributes(pk, self._path)
+        return result
 
     def list(self) -> List:
         """
@@ -257,7 +273,8 @@ class GithubRepo(BaseObject):
         :return: The list of items.
         :rtype: List
         """
-        return github_adapter.list(self._path)
+        (result, _) = GithubAdapter.instance().list(self._path)
+        return result
 
 
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et
