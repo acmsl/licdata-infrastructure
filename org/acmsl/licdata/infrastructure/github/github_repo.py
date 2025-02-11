@@ -192,29 +192,7 @@ class GithubRepo(BaseObject):
             newEntityRequested=newEntityRequested,
             buildNewEntity=buildNewEntity,
             path=self._path,
-            primaryKey=self._primary_key,
-            filterKeys=self._filter_attributes,
-            attributeNames=self._attributes,
-            sensitiveAttributes=self._sensitive_attributes,
         )
-
-    def update(self, item) -> bool:
-        """
-        Updates an item.
-        :param item: The item to update.
-        :type item: object
-        :return: True if the item gets updated.
-        :rtype: bool
-        """
-        (result, _) = GithubAdapter.instance().update(
-            item,
-            self._path,
-            self._primary_key,
-            self._filter_attributes,
-            self._attributes,
-            self._sensitive_attributes,
-        )
-        return result
 
     def delete(
         self,
@@ -236,8 +214,34 @@ class GithubRepo(BaseObject):
             buildEntity=buildEntity,
             buildInvalidDeleteEntityRequestEvent=buildInvalidDeleteEntityRequestEvent,
             path=self._path,
-            attributeNames=self._attributes,
-            sensitiveAttributes=self._sensitive_attributes,
+        )
+
+    def update(
+        self,
+        updateEntityRequested: Event,
+        buildEntity: Callable[[Dict], Entity],
+        buildEntityUpdatedEvent: Callable[[Entity, Event], Event],
+        buildInvalidUpdateEntityRequestEvent: Callable[[Event], Event],
+    ) -> Event:
+        """
+        Updates an item.
+        :param updateClientRequested: The event requesting the removal of the client.
+        :type updateClientRequested: org.acmsl.licdata.events.clients.DeleteClientRequested
+        :param buildEntity: A function to build the updated entity.
+        :type buildEntity: Callable[[Dict], Entity]
+        :param buildEntityUpdatedEvent: A function to create the entity-updated event.
+        :type buildEntityUpdatedEvent: Callable[[Entity, Event], Event],
+        :param buildInvalidUpdateEntityRequestEvent: A function to build the invalid-update-entity-request event.
+        :type buildInvalidUpdateEntityRequestEvent: Callable[[pythoneda.shared.Event], pythoneda.shared.Event]
+        :return: The entity-updated event if the entity gets removed.
+        :rtype: pythoneda.shared.Event
+        """
+        return GithubAdapter.instance().update(
+            updateEntityRequested=updateEntityRequested,
+            buildEntity=buildEntity,
+            buildEntityUpdatedEvent=buildEntityUpdatedEvent,
+            buildInvalidUpdateEntityRequestEvent=buildInvalidUpdateEntityRequestEvent,
+            path=self._path,
         )
 
     def delete_by_pk(self, primaryKey: List) -> object:

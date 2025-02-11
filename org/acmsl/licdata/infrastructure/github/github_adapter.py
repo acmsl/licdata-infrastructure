@@ -200,10 +200,6 @@ class GithubAdapter(BaseObject):
         newEntityRequested: Event,
         buildNewEntity: Callable[[Event], Tuple[Entity, Event]],
         path: str,
-        primaryKey: List,
-        filterKeys: List,
-        attributeNames: List,
-        sensitiveAttributes: List,
     ) -> Event:
         """
         Inserts a new entity.
@@ -213,14 +209,6 @@ class GithubAdapter(BaseObject):
         :type buildNewEntity: callable[[pythoneda.shared.Event], Tuple[pythoneda.shared.Entity, pythoneda.shared.Event]]
         :param path: The relative path.
         :type path: str
-        :param primaryKey: The entity's primary key.
-        :type primaryKey: List
-        :param filterKeys: The entity's filter keys.
-        :type filterKeys: List
-        :param attributeNames: The entity's attribute names.
-        :type attributeNames: List
-        :param sensitiveAttributes: The names of the attributes that need to be encrypted.
-        :type sensitiveAttributes: List
         :return: The event representing the new entity has been created.
         :rtype: pythoneda.shared.Event
         """
@@ -326,8 +314,6 @@ class GithubAdapter(BaseObject):
         buildEntity: Callable[[Dict], Entity],
         buildInvalidDeleteEntityRequestEvent: Callable[[Event], Event],
         path: str,
-        attributeNames: List,
-        sensitiveAttributes: List,
     ) -> Dict:
         """
         Deletes an item in the repository.
@@ -339,10 +325,6 @@ class GithubAdapter(BaseObject):
         :type buildInvalidDeleteEntityRequestEvent: Callable[[pythoneda.shared.Event], pythoneda.shared.Event]
         :param path: The relative path.
         :type path: str
-        :param attributeNames: The entity's attribute names.
-        :type attributeNames: List
-        :param sensitiveAttributes: The names of the attributes that need to be encrypted.
-        :type sensitiveAttributes: List
         :return: The event representing the new entity has been deleted.
         :rtype: pythoneda.shared.Event
         """
@@ -427,86 +409,6 @@ class GithubAdapter(BaseObject):
                     )
 
         return result
-
-    def update(
-        self,
-        entity,
-        path: str,
-        primaryKey: List,
-        filterKeys: List,
-        attributeNames: List,
-        sensitiveAttributes: List,
-    ) -> Tuple[Dict, str]:
-        """
-        Updates given entity.
-        :param entity: The entity to update.
-        :type entity: ValueObject from pythoneda.value_object
-        :param path: The relative path.
-        :type path: str
-        :param primaryKey: The entity's primary key.
-        :type primaryKey: List
-        :param filterKeys: The entity's filter keys.
-        :type filterKeys: List
-        :param attributeNames: The entity's attribute names.
-        :type attributeNames: List
-        :param sensitiveAttributes: The names of the attributes that need to be encrypted.
-        :type sensitiveAttributes: List
-        :return: The updated entity and the new sha.
-        :rtype: Tuple[Dict, str]
-        """
-        id = entity.get("id")
-        item = {}
-        item["id"] = id
-        for attribute in primaryKey + filterKeys:
-            value = entity.get(attribute)
-            if attribute in sensitiveAttributes:
-                value = encrypt(value)
-                item[attribute] = value
-        try:
-            (data, sha) = get_contents(f"{path}/data.json")
-        except Exception as err:
-            GithubAdapter.logger().error(err)
-            data = None
-
-        if data is not None:
-            content = json.loads(data)
-            existing = [x for x in content if x.get("id") == id]
-            if existing and not self._attributes_match(
-                existing[0], entity, attributeNames
-            ):
-                remaining = [x for x in content if x.get("id") != id]
-                remaining.append(item)
-                update_file(
-                    f"{path}/data.json",
-                    json.dumps(remaining),
-                    f"Updated {id} in {path}/data.json",
-                    sha,
-                )
-        try:
-            (old_item, oldSha) = get_contents(f"{path}/{id}/data.json")
-        except Exception as err:
-            GithubAdapter.logger().error(err)
-            old_item = None
-
-        if old_item is not None:
-            for attribute in attributeNames:
-                value = entity.get(attribute)
-                if attribute in sensitiveAttributes:
-                    value = encrypt(value)
-                item[attribute] = value
-            item["id"] = id
-            item["_created"] = entity.get("_created")
-            item["_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            newSha = update_file(
-                f"{path}/{id}/data.json",
-                json.dumps(item),
-                f"Updated {path}/{id}/data.json",
-                oldSha,
-            )
-        else:
-            GithubAdapter.logger().info(f"{path}/{id}/data.json not found")
-
-        return (item, newSha)
 
     def delete_by_pk(
         self,
@@ -605,6 +507,75 @@ class GithubAdapter(BaseObject):
         """
         (data, sha) = get_contents(f"{path}/data.json")
         return (json.loads(data), sha)
+
+    def update(
+        self,
+        updateEntityRequested: Event,
+        buildEntity: Callable[[Event], Tuple[Entity, Event]],
+        buildEntityUpdatedEvent: Callable[[Entity, Event], Event],
+        buildInvalidUpdateEntityRequestEvent: Callable[[Event], Event],
+        path: str,
+    ) -> Event:
+        """
+        Inserts a new entity.
+        :param updateEntityRequested: The event requesting the update of an entity.
+        :type updateEntityRequested: pythoneda.shared.Event
+        :param buildEntity: A function to create the entity.
+        :type buildEntity: callable[[Dict], pythoneda.shared.Entity]
+        :param buildEntityUpdatedEvent: A function to create the entity-updated event.
+        :type buildEntityUpdatedEvent: Callable[[Entity, Event], Event],
+        :param buildInvalidUpdateEntityRequestEvent: A function to build the invalid-update-entity-request event.
+        :type buildInvalidUpdateEntityRequestEvent: Callable[[pythoneda.shared.Event], pythoneda.shared.Event]
+        :param path: The relative path.
+        :type path: str
+        :return: The event representing the new entity has been updated.
+        :rtype: pythoneda.shared.Event
+        """
+        result = None
+        try:
+            entity = None
+            sha = None
+            if updateEntityRequested.entity_id is not None:
+                (entity, sha) = self.find_by_id(
+                    id=updateEntityRequested.entity_id,
+                    path=path,
+                    buildEntity=buildEntity,
+                )
+            elif updateEntityRequested.entity_primary_key is not None:
+                (entity, sha) = self.find_by_pk(
+                    updateEntityRequested.entity_primary_key, path, buildEntity
+                )
+
+            if entity is None:
+                print(f"Entity not found!")
+                result = buildInvalidUpdateEntityRequestEvent(updateEntityRequested)
+            else:
+                result = buildEntityUpdatedEvent()
+                entity.apply(result)
+                update_file(
+                    f"{path}/{entity.id}/data.json",
+                    json.dumps(entity.to_dict()),
+                    result.to_json(),
+                    sha,
+                )
+
+                entity_name = camel_to_snake(entity.__class__.__name__)
+                timestamp = datetime.now().timestamp()
+                create_file(
+                    f"{path}/{entity.id}/_events/{timestamp}-update_{entity_name}_requested.json",
+                    updateEntityRequested.to_json(),
+                    updateEntityRequested.to_json(),
+                )
+                timestamp = datetime.now().timestamp()
+                create_file(
+                    f"{path}/{entity.id}/_events/{timestamp}-{entity_name}_updated.json",
+                    result.to_json(),
+                    result.to_json(),
+                )
+        except Exception as err:
+            GithubAdapter.logger().error(err)
+
+        return result
 
 
 # vim: syntax=python ts=4 sw=4 sts=4 tw=79 sr et

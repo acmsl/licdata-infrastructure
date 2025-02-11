@@ -23,9 +23,12 @@ from org.acmsl.licdata import Client, ClientRepo
 from org.acmsl.licdata.events.clients import (
     DeleteClientRequested,
     ClientDeleted,
+    ClientUpdated,
     InvalidDeleteClientRequest,
+    InvalidUpdateClientRequest,
     NewClientCreated,
     NewClientRequested,
+    UpdateClientRequested,
 )
 from org.acmsl.licdata.infrastructure.github import GithubRepo
 
@@ -124,14 +127,6 @@ class GithubClientRepo(ClientRepo):
         new_client = Client.create_from(newClientRequested)
         return (new_client, new_client.created_event)
 
-    def update(self, item):
-        """
-        Updates a Client.
-        :param item: The client to update.
-        :type item: Client from domain.client
-        """
-        return self._github_repo.update(item)
-
     def delete(
         self,
         deleteClientRequested: DeleteClientRequested,
@@ -156,8 +151,6 @@ class GithubClientRepo(ClientRepo):
         Creates a new ClientDeleted event.
         :param deleteClientRequested: The event requesting the removal of the client.
         :type deleteClientRequested: org.acmsl.licdata.events.clients.DeleteClientRequested
-        :param clientData: The client data.
-        :type clientData
         :return: The event.
         :rtype: org.acmsl.licdata.events.clients.ClientDeleted
         """
@@ -177,6 +170,75 @@ class GithubClientRepo(ClientRepo):
         return InvalidDeleteClientRequest(
             deleteClientRequested.entity_id,
             deleteClientRequested.previous_event_ids + [deleteClientRequested.id],
+        )
+
+    def update(self, updateClientRequested: UpdateClientRequested) -> ClientUpdated:
+        """
+        Updates a Client.
+        :param updateClientRequested: The event requesting the update of a client.
+        :type updateClientRequested: org.acmsl.licdata.events.clients.UpdateClientRequested
+        :return: The event.
+        :rtype: org.acmsl.licdata.events.clients.ClientUpdated
+        """
+
+        def build_client_from_update_requested(attrs: Dict) -> Client:
+            """
+            Builds a Client using an UpdateClientRequested event.
+            :param attrs: The attributes.
+            :type attrs: Dict
+            :return: The client.
+            :rtype: org.acmsl.licdata.Client
+            """
+            aux = attrs.copy()
+            if updateClientRequested.address is not None:
+                aux["address"] = updateClientRequested.address
+            if updateClientRequested.contact is not None:
+                aux["contact"] = updateClientRequested.contact
+            if updateClientRequested.phone is not None:
+                aux["phone"] = updateClientRequested.phone
+            print(f"Creating a Client from {aux}")
+            result = Client.from_dict(aux)
+            print(f"Created Client: {result}")
+            return result
+
+        def build_client_updated_from_update_requested() -> ClientUpdated:
+            """
+            Builds a ClientUpdated event using an UpdateClientRequested event.
+            :return: The updated event.
+            :rtype: org.acmsl.licdata.events.clients.ClientUpdated
+            """
+            print(f"Creating ClientUpdatedfrom {updateClientRequested}")
+            return ClientUpdated(
+                entityId=updateClientRequested.entity_id,
+                address=updateClientRequested.address,
+                contact=updateClientRequested.contact,
+                phone=updateClientRequested.phone,
+                previousEventIds=(
+                    updateClientRequested.previous_event_ids
+                    + [updateClientRequested.id]
+                ),
+            )
+
+        return self._github_repo.update(
+            updateEntityRequested=updateClientRequested,
+            buildEntity=build_client_from_update_requested,
+            buildEntityUpdatedEvent=build_client_updated_from_update_requested,
+            buildInvalidUpdateEntityRequestEvent=self.build_invalid_update_entity_request_event,
+        )
+
+    def build_invalid_update_entity_request_event(
+        self, updateClientRequested: UpdateClientRequested
+    ) -> InvalidUpdateClientRequest:
+        """
+        Builds an InvalidUpdateClientRequest event.
+        :param updateClientRequested: The event requesting the update of a client.
+        :type updateClientRequested: org.acmsl.licdata.events.clients.UpdateClientRequested
+        :return: The event.
+        :rtype: org.acmsl.licdata.events.clients.InvalidUpdateClientRequest
+        """
+        return InvalidUpdateClientRequest(
+            updateClientRequested.entity_id,
+            updateClientRequested.previous_event_ids + [updateClientRequested.id],
         )
 
     def find_by_pk(self, pk: Dict) -> Optional[Client]:
